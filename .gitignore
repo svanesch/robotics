@@ -1,0 +1,6 @@
+.pixi/
+__pycache__/
+*.egg-info/
+datasets/
+runs/
+MUJOCO_LOG.TXT

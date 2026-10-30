@@ -1,0 +1,43 @@
+# UR5e (6 DoF) + Robotiq 2F-85 parallel gripper, both from mujoco_menagerie. Base on the table surface (z=0).
+name: ur5e
+mjcf: third_party/mujoco_menagerie/universal_robots_ur5e/ur5e.xml
+arm_joints: [shoulder_pan_joint, shoulder_lift_joint, elbow_joint, wrist_1_joint, wrist_2_joint, wrist_3_joint]
+arm_actuators: [shoulder_pan, shoulder_lift, elbow, wrist_1, wrist_2, wrist_3]
+home_qpos: [-1.5708, -1.5708, 1.5708, -1.5708, -1.5708, 0.0]
+gripper:
+  mjcf: third_party/mujoco_menagerie/robotiq_2f85/2f85.xml
+  attach_site: attachment_site
+  attach_body: base_mount
+  attach_prefix: grip_
+  actuator: grip_fingers_actuator
+  ctrl_open: 0
+  ctrl_closed: 255
+  state_joint: grip_right_driver_joint
+  q_open: 0.0
+  q_closed: 0.8
+ee_site: grip_pinch
+tool_axis: [0, 0, 1]
+grasp_axis: [0, 1, 0]
+wrist_cam:
+  body: grip_base
+  pos: [0.07, 0.0, 0.04]
+  xyaxes: [1, 0, 0, 0, -1, 0]
+  fovy: 85
+external_cam_pos: [1.0, 0.0, 0.7]
+external_cam_lookat: [0.4, 0.0, 0.1]
+cube_half_size: 0.02
+workspace_x: [0.3, 0.55]
+workspace_y: [-0.25, 0.25]
+min_object_dist: 0.12
+table_half: [0.5, 0.45]
+table_center: [0.27, 0.0]
+cell_spacing: 2.2
+ik_ori_weight: 0.5
+approach_height: 0.15
+max_ee_speed: 0.4
+grasp_height: 0.0
+ready_pos: [0.4, 0.0, 0.3]
+gripper_bodies: [grip_left_pad, grip_right_pad]
+gripper_friction: 2.0
+object_friction: 2.0
+table_color: [0.42, 0.45, 0.5]   # slate grey laminate

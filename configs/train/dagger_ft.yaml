@@ -1,0 +1,35 @@
+# Fine-tune a trained policy on the original expert data + DAgger data (states the policy visited, labelled by the expert).
+dataset: [datasets/so101_v1, datasets/dagger_1]
+root_weights: [1.0, 3.0]   # DAgger frames are ~4x fewer than expert frames; sample them 3x as often
+run_name: d1
+chunk: 16
+batch_size: 32
+lr: 5.0e-5
+backbone_lr: 1.0e-5
+lang_lr: 1.0e-4
+weight_decay: 1.0e-4
+grad_clip: 10.0
+steps: 4000
+eval_every: 1000
+log_every: 100
+val_batches: 60
+warmup_steps: 200
+num_workers: 4
+seed: 1
+amp: false
+freeze_backbone_modules: 5
+early_frame_weight: 3.0
+early_frames: 50
+model:
+  d_model: 256
+  enc_layers: 4
+  dec_layers: 4
+  ff: 1024
+  dropout: 0.1
+  pretrained: true
+  image_size: 128
+augment:
+  shift: 8
+  brightness: 0.2
+  contrast: 0.2
+  saturation: 0.2

@@ -1,0 +1,47 @@
+# SO-101 (TheRobotStudio/SO-ARM100): 5 joints + gripper. Base sits on the table surface (z=0).
+name: so101
+mjcf: third_party/SO-ARM100/Simulation/SO101/so101_new_calib.xml
+arm_joints: [shoulder_pan, shoulder_lift, elbow_flex, wrist_flex, wrist_roll]
+arm_actuators: [shoulder_pan, shoulder_lift, elbow_flex, wrist_flex, wrist_roll]
+home_qpos: [0.0, -1.2, 1.2, 0.8, 0.0]
+gripper:
+  actuator: gripper
+  ctrl_open: 1.7
+  ctrl_closed: -0.1
+  state_joint: gripper
+  q_open: 1.7
+  q_closed: -0.1
+ee_site: gripperframe
+tool_axis: [1, 0, 0]
+grasp_axis: [0, 0, 1]
+grasp_offset: [-0.02, 0, 0.0215]  # fingertip frame -> point between the jaws
+wrist_cam:
+  body: gripper
+  pos: [0.02, -0.04, -0.03]
+  xyaxes: [1, 0, 0, 0, 1, 0]
+  fovy: 80
+external_cam_pos: [0.55, 0.0, 0.4]
+external_cam_lookat: [0.15, 0.0, 0.1]
+external_cam_fovy: 60
+cube_half_size: 0.0125
+cube_half_height: 0.03
+workspace_x: [0.17, 0.28]
+workspace_y: [-0.12, 0.12]
+table_half: [0.27, 0.32]
+table_center: [0.15, 0.0]
+cell_spacing: 1.2
+approach_height: 0.06
+ik_ori_weight: 0.15
+approach_tilt_deg: 0
+grasp_height: 0.01
+gripper_bodies: [gripper, moving_jaw_so101_v1]
+ready_pos: [0.2, 0.0, 0.12]
+min_object_dist: 0.11
+table_color: [0.66, 0.5, 0.36]   # light wood
+zone_xy: [0.21, 0.20]   # 'left' pad = +y (robot's left), 'right' pad = -y
+zone_half: 0.045
+# gripper realism: a 3 N*m jaw crushes light blocks through soft contacts; a few N grip force plus stiffer contacts and
+# the no-slip pass lets the jaws hold them (lift 16/16, place 16/16 in tests)
+gripper_force: 0.6
+contact_timeconst: 0.01
+noslip_iterations: 5
