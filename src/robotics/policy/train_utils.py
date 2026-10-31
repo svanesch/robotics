@@ -62,3 +62,18 @@ def load_policy(path, device: str | torch.device = "cpu") -> tuple[VLA, dict]:
     model.load_state_dict(ck["model"])
     model.eval()
     return model, ck
+
+
+def policy_loss(pred, actions, is_pad, stats, grip_bce: bool, bce_weight: float = 1.0):
+    """L1 on the (normalised) joint targets. With grip_bce the last output is a logit for "close" (open/close is a decision,
+    not a number): binary cross-entropy against the expert's command (raw > 0.5), so there is no value in between to settle on."""
+    valid = (~is_pad)[..., None].float()
+    if not grip_bce:
+        return ((pred - actions).abs() * valid).sum() / (valid.sum() * pred.shape[-1] + 1e-8)
+    l1 = ((pred[..., :-1] - actions[..., :-1]).abs() * valid).sum() / (valid.sum() * (pred.shape[-1] - 1) + 1e-8)
+    mean = torch.as_tensor(stats["action_mean"][-1], device=actions.device).float()
+    std = torch.as_tensor(stats["action_std"][-1], device=actions.device).float()
+    target = ((actions[..., -1] * std + mean) > 0.5).float()
+    bce = torch.nn.functional.binary_cross_entropy_with_logits(pred[..., -1], target, reduction="none")
+    bce = (bce * valid[..., 0]).sum() / (valid.sum() + 1e-8)
+    return l1 + bce_weight * bce

@@ -170,3 +170,15 @@ def test_camera_audit_ur5e():
     r = subprocess.run([sys.executable, "scripts/audit_cameras.py", "--robot", "ur5e", "--episodes", "8", "--seed", "5",
                         "--min-fingers", "0.9", "--min-wrist", "0", "--external-items", "blocks,tip", "--min-external", "0.95"], cwd=root, capture_output=True, text=True)
     assert r.returncode == 0, r.stdout[-900:]
+
+
+def test_ur5e_binary_gripper_command_is_open_or_closed():
+    cfg = load_robot("ur5e")
+    assert cfg.gripper_binary
+    env = MultiCellEnv(cfg, 1, 32, render=False)
+    env.reset_cell(0, sample_scene(cfg, np.random.default_rng(3)))
+    g = cfg.gripper
+    for cmd, expect in ((0.3, 0.0), (0.49, 0.0), (0.51, 1.0), (1.0, 1.0)):
+        env.step(np.append(env.state(0)[:-1], cmd)[None])
+        want = g.ctrl_open + expect * (g.ctrl_closed - g.ctrl_open)
+        assert env.data.ctrl[env.cells[0]["grip_ctrl"]] == want

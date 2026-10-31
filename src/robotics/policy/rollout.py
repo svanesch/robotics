@@ -85,6 +85,7 @@ class PolicyRunner:
         self.model, self.device = model, torch.device(device)
         self.stats = {k: np.asarray(v, np.float32) for k, v in ckpt["stats"].items()}
         self.chunk = model.cfg.chunk
+        self.grip_bce = bool(ckpt.get("train_cfg", {}).get("grip_bce", False))
         self.tok = Tokenizer(model.cfg.max_text)
 
     @torch.no_grad()
@@ -93,7 +94,10 @@ class PolicyRunner:
         f = lambda im: torch.from_numpy(im).to(self.device).permute(0, 3, 1, 2).float() / 255.0  # noqa: E731
         s = torch.from_numpy((state - self.stats["state_mean"]) / self.stats["state_std"]).float().to(self.device)
         out = self.model(f(wrist), f(external), s, torch.from_numpy(tokens).to(self.device))
-        return out.cpu().numpy() * self.stats["action_std"] + self.stats["action_mean"]
+        raw = out.cpu().numpy() * self.stats["action_std"] + self.stats["action_mean"]
+        if self.grip_bce:  # the last output is a "close" logit -> probability; the env closes above 0.5
+            raw[..., -1] = 1.0 / (1.0 + np.exp(-out.cpu().numpy()[..., -1]))
+        return raw
 
 
 def run_episodes(runner: PolicyRunner, env: MultiCellEnv, scenes: list, max_steps: int = MAX_STEPS,

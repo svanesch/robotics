@@ -100,3 +100,20 @@ def test_text_free_model_ignores_the_prompt_and_has_no_text_parameters():
         assert torch.equal(m(x, x, s, a), m(x, x, s, b)) and torch.equal(m(x, x, s, a), m(x, x, s))
     m.train()
     m(x, x, s).mean().backward()
+
+
+def test_policy_loss_gripper_bce_is_a_binary_decision():
+    from robotics.policy.train_utils import policy_loss
+
+    stats = {"action_mean": np.array([0.0] * 6 + [0.5], np.float32), "action_std": np.array([1.0] * 6 + [0.5], np.float32)}
+    actions = torch.zeros(2, 4, 7)
+    actions[..., -1] = torch.tensor([-1.0, 1.0]).view(2, 1)  # raw gripper 0 (open) and 1 (close)
+    pad = torch.zeros(2, 4, dtype=torch.bool)
+    good = torch.zeros(2, 4, 7)
+    good[..., -1] = torch.tensor([-8.0, 8.0]).view(2, 1)  # confident logits
+    undecided = torch.zeros(2, 4, 7)  # logit 0 = 50/50
+    assert policy_loss(good, actions, pad, stats, True) < 0.01
+    assert policy_loss(undecided, actions, pad, stats, True) > 0.6
+    wrong = -good
+    assert policy_loss(wrong, actions, pad, stats, True) > 5.0
+    assert policy_loss(good, actions, pad, stats, False) >= 0.0  # the L1 path is unchanged

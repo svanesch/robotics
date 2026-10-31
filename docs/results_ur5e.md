@@ -15,6 +15,9 @@ Model selection on 100 validation scenes, one run on 150 test scenes at the end.
 | ur5e_lift_b | 30k steps from scratch | 55% | - |
 | ur5e_abl_B | + 400 dropped-block / re-pick episodes | 62% | - |
 | ur5e_abl_A | + DAgger data with the label defect (below) | 46% | - |
+| ur5e_lift_d | binary open/close gripper command (new data `ur5e_lift_v3`, 800 episodes, 99% expert success, 10k steps) | 48% | - |
+| ur5e_lift_e | binary command + BCE loss on the gripper (`grip_bce`), same data v3 | 54% | - |
+| ur5e_lift_e1 | + one DAgger round on ur5e_lift_e (207 episodes, binary gripper), 4k steps | **79%** | **78%** (117/150) |
 | ur5e_lift_c | NEW expert data with a short grasp wait (grip_rate 0.08, settle 4; episodes 93 instead of 165 steps) | 33% | - |
 
 The 80% gate of the plan was NOT reached; stacking was therefore not started.
@@ -37,6 +40,25 @@ Result: **worse, 33% on validation (ur5e_lift_a: 61%)**.
   the gripper got within 4 cm of the block in only 61/100 validation scenes (before 97%) and "closed on nothing" went from 8 to 51: the policy now closes the gripper too early, while still approaching.
 - Reading: removing the long wait over-corrected. The wait does a job (it lets the grip build up) and the shorter, faster closing makes the close/lift timing much harder to learn.
   A middle setting (e.g. grip_rate 0.03, settle 10) or giving the policy memory (previous action / two frames) are the untested options. Not proven which.
+
+## Experiment: binary open/close gripper (ur5e_lift_d, Oct 31)
+Change: the gripper command is only open or closed (`gripper_binary`); the expert lifts when the jaws have stopped moving instead of after a timer.
+Result: **48% on validation (ur5e_lift_a 61%, ur5e_d1 69%)**, within 4 cm of the block 76/100, grasped 65, lifted 51.
+- Stalls ("closed, arm never rose") are gone: 0 of 48 classified scenes (before 13).
+- But 14/48 "never closed the gripper" (the policy hovers near the block without issuing close) and 11/48 "arm rose, block stayed".
+- Reading: removing the hidden timer removed the stall, but a hard 0/1 command is harder to learn at the right moment (closing decision is a sharp switch, L1 on a step function). Not yet proven; the policy output is thresholded at 0.5, so near-0.5 outputs may flip.
+- Untested options: classification (BCE) loss on the gripper dimension, previous action / two frames as input, middle wait.
+
+## Experiment: BCE on the binary gripper (ur5e_lift_e, Oct 31)
+Same data as ur5e_lift_d; the gripper output is a logit trained with binary cross-entropy (no value in between), joints stay L1.
+Result: **54% on validation** (d: 48%, a: 61%, d1: 69%; all within noise of each other except d1). Within 4 cm 88/100, grasped 58, lifted 55.
+Classified 48 scenes: 27 success, 11 never closed, 8 arm rose but block stayed, 2 lost after lifting. Stalls remain gone.
+Reading: the stall is solved but the policy still hovers near the block without issuing "close" in about a quarter of the scenes. These hovering states are rare in expert data, which is what DAgger addresses (next: DAgger round on ur5e_lift_e).
+
+## Experiment: DAgger on the binary gripper (ur5e_lift_e1, Oct 31)
+The policy ur5e_lift_e drove 207 episodes (29.5k policy-driven frames, expert success at the end 179/207, 12 episodes cut for no valid label); fine-tuned on v3 + these (weight 3), 4k steps.
+Result: **79% on validation** (e: 54%), within 4 cm 89/100, grasped 87, lifted 83. Classified 48 scenes: 39 success, 6 never closed, 1 reopened, 1 slipped, 1 lost.
+Test (one run, 150 scenes): **78% (117/150)**; within 4 cm 131/150, grasped 125, lifted 122. Above the relaxed ~75% gate, so stacking starts (docs/plan_stacking.md).
 
 ## Recommendations
 - The grasp-then-lift timing is the weak point (stalls with the long wait, early lift and early closing with the short one). Next options: a middle setting, or give the policy its previous action / two frames so it knows how long it has been waiting.

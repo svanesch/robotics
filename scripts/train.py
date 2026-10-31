@@ -13,7 +13,7 @@ from torch.utils.data import ConcatDataset, DataLoader, WeightedRandomSampler
 from robotics.policy.data import VLADataset
 from robotics.policy.model import VLA, VLAConfig, count_params
 from robotics.policy.tokenizer import Tokenizer
-from robotics.policy.train_utils import augment, save_checkpoint, to_device
+from robotics.policy.train_utils import augment, policy_loss, save_checkpoint, to_device
 from robotics.policy.views import save_view, train_view, val_view
 from robotics.status import StatusReporter
 
@@ -23,7 +23,8 @@ def masked_l1(pred, target, is_pad):
 
 
 @torch.no_grad()
-def evaluate(model, loader, device, action_std, max_batches):
+def evaluate(model, loader, device, stats, max_batches, grip_bce=False):
+    action_std = stats["action_std"]
     model.eval()
     tot, n, per_joint = 0.0, 0, torch.zeros(len(action_std), device=device)
     for b, batch in enumerate(loader):
@@ -31,7 +32,7 @@ def evaluate(model, loader, device, action_std, max_batches):
             break
         x = to_device(batch, device)
         pred = model(x["wrist"], x["external"], x["state"], x["tokens"])
-        tot += masked_l1(pred, x["actions"], x["is_pad"]).item()
+        tot += policy_loss(pred, x["actions"], x["is_pad"], stats, grip_bce).item()
         valid = (~x["is_pad"])[..., None].float()
         per_joint += ((pred - x["actions"]).abs() * valid).sum((0, 1)) / valid.sum()
         n += 1
@@ -116,6 +117,7 @@ def main():
         return 0.5 * (1 + math.cos(math.pi * (s - cfg["warmup_steps"]) / max(1, cfg["steps"] - cfg["warmup_steps"])))
 
     aug = cfg["augment"]
+    grip_bce = bool(cfg.get("grip_bce", False))
     rep = StatusReporter("train", cfg["run_name"], total=cfg["steps"],
                          meta={"dataset": str(cfg["dataset"]), "batch": cfg["batch_size"], "init_from": a.init_from or "-", "device": str(device)})
     rep.update(progress=step)
@@ -141,7 +143,7 @@ def main():
         for g, lr in zip(optim.param_groups, base_lrs):
             g["lr"] = lr * lr_scale(step)
         pred = model(x["wrist"], x["external"], x["state"], x["tokens"])
-        loss = masked_l1(pred, x["actions"], x["is_pad"])
+        loss = policy_loss(pred, x["actions"], x["is_pad"], first.stats, grip_bce, cfg.get("bce_weight", 1.0))
         optim.zero_grad(set_to_none=True)
         loss.backward()
         torch.nn.utils.clip_grad_norm_(model.parameters(), cfg["grad_clip"])
@@ -158,7 +160,7 @@ def main():
             rep.preview(last_train, key="train", min_interval=3.0)
             run_loss, t0 = 0.0, time.time()
         if step % cfg["eval_every"] == 0 or step == cfg["steps"]:
-            val, raw = evaluate(model, val_loader, device, first.stats["action_std"], cfg["val_batches"])
+            val, raw = evaluate(model, val_loader, device, first.stats, cfg["val_batches"], grip_bce)
             rec = {"step": step, "val_l1": val, "val_l1_raw_per_joint": [round(float(v), 4) for v in raw]}
             print(json.dumps(rec), flush=True); log.write(json.dumps(rec) + "\n"); log.flush()
             rep.update(progress=step, val_l1=val)
