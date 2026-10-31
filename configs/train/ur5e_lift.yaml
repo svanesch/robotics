@@ -1,0 +1,35 @@
+# UR5e pick-and-lift, no text prompt: ACT-style policy on images + joint state (behaviour first).
+dataset: datasets/ur5e_lift_v1
+run_name: ur5e_lift_a
+chunk: 16
+batch_size: 32
+lr: 1.0e-4
+backbone_lr: 2.0e-5
+lang_lr: 1.0e-4          # unused without text
+weight_decay: 1.0e-4
+grad_clip: 10.0
+steps: 10000
+eval_every: 1000
+log_every: 100
+val_batches: 60
+warmup_steps: 500
+num_workers: 4
+seed: 0
+amp: false
+freeze_backbone_modules: 5
+early_frame_weight: 1.0  # one block, nothing to choose between
+early_frames: 50
+model:
+  d_model: 256
+  enc_layers: 4
+  dec_layers: 4
+  ff: 1024
+  dropout: 0.1
+  pretrained: true
+  image_size: 128
+  text: false
+augment:
+  shift: 8
+  brightness: 0.2
+  contrast: 0.2
+  saturation: 0.2

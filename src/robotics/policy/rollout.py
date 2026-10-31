@@ -97,7 +97,7 @@ class PolicyRunner:
 
 
 def run_episodes(runner: PolicyRunner, env: MultiCellEnv, scenes: list, max_steps: int = MAX_STEPS,
-                 record_cell0=None, ens_m: float = 0.01, replan: int | None = None) -> list[EpisodeResult]:
+                 record_cell0=None, ens_m: float = 0.01, replan: int | None = None, status=None) -> list[EpisodeResult]:
     """Run len(scenes) episodes, `env.n` at a time in parallel cells. record_cell0(frame_fn) gets called each step for cell 0."""
     results: list[EpisodeResult] = []
     cfg = env.cfg
@@ -127,9 +127,13 @@ def run_episodes(runner: PolicyRunner, env: MultiCellEnv, scenes: list, max_step
                                   np.stack([env.state(i) for i in range(env.n)]), tokens)
             actions = np.stack([ens.add(i, t, pred[i]) for i in range(env.n)])
             actions[:, -1] = np.clip(actions[:, -1], 0.0, 1.0)
+            if status is not None:
+                status.preview(np.concatenate([imgs[0]["wrist"], imgs[0]["external"]], 1))
             if record_cell0 is not None and batch_start == 0:
                 record_cell0(imgs[0])
             env.step(actions)
+            if status is not None:
+                status.snapshot(env.model, env.data)
             for i in range(n):
                 if done[i]:
                     continue
@@ -170,6 +174,8 @@ def run_episodes(runner: PolicyRunner, env: MultiCellEnv, scenes: list, max_step
                                          (s.cube_colors[s.target], s.task) in HELD_OUT,
                                          d_t[i], d_o[i], closed_t[i] > 5, closed_o[i] > 5,
                                          int(s.active.sum()), other_lifted[i], target_lifted[i]))
+        if status is not None:
+            status.update(progress=len(results), success_rate=sum(r.success for r in results) / len(results))
     return results
 
 

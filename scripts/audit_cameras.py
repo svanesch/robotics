@@ -46,6 +46,16 @@ def visible(model, data, cam_id, point, body_id):
     return gid[0] >= 0 and model.geom_bodyid[gid[0]] == body_id and hit >= 0
 
 
+def first_hit_body(model, data, cam_id, point):
+    """Name of the body that a ray from the camera towards `point` hits first ('' if nothing)."""
+    origin = data.cam_xpos[cam_id]
+    d = np.asarray(point) - origin
+    dist = np.linalg.norm(d)
+    gid = np.zeros(1, np.int32)
+    mujoco.mj_ray(model, data, origin, d / dist, None, 1, -1, gid)
+    return model.body(model.geom_bodyid[gid[0]]).name if gid[0] >= 0 else ""
+
+
 def main():
     p = argparse.ArgumentParser()
     p.add_argument("--robot", default="so101")
@@ -55,13 +65,24 @@ def main():
     p.add_argument("--image-size", type=int, default=128)
     p.add_argument("--min-external", type=float, default=0.99)
     p.add_argument("--min-wrist", type=float, default=0.90)
+    p.add_argument("--external-items", default="blocks,tip,base,elbow",
+                   help="what the external camera must keep in frame (a base-mounted camera needs only blocks,tip)")
+    p.add_argument("--min-visible", type=float, default=0.0, help="required fraction of frames in which the blocks / gripper tip are not hidden behind the arm")
+    p.add_argument("--min-fingers", type=float, default=0.0, help="required fraction of grasp-phase frames in which EVERY finger body is in the wrist view (0 = report only)")
     a = p.parse_args()
     cfg = load_robot(a.robot)
     env = MultiCellEnv(cfg, a.cells, a.image_size)
     ik, rng = ArmIK(cfg), np.random.default_rng(a.seed)
     m, d, S = env.model, env.data, a.image_size
-    ext = {k: [] for k in ("blocks", "tip", "base", "elbow", "all")}
-    wrist = {"target_in_frame": [], "target_visible": [], "jaw": []}
+    items = a.external_items.split(",")
+    ext = {k: [] for k in ("blocks", "tip", "base", "elbow", "blocks visible", "tip visible", "all")}
+    wrist = {"target_in_frame": [], "target_visible": []}
+    rs = mujoco.Renderer(m, S, S)
+    rs.enable_segmentation_rendering()
+    finger_geoms = [{n: [g for g in range(m.ngeom) if m.body(m.geom_bodyid[g]).name == f"c{i}/{n}"] for n in cfg.gripper_bodies}
+                    for i in range(a.cells)]
+    fingers = {n: [] for n in cfg.gripper_bodies}
+    fingers_all = []
     worst = []  # (score, frame)
     done_eps = 0
     while done_eps < a.episodes:
@@ -84,15 +105,23 @@ def main():
                     pre = e.phase in (APPROACH, DESCEND, GRASP)
                     pre_world = env.cube_pos(i) + c["origin"]
                     tip = d.site_xpos[c["site"]]
-                    base = d.xpos[m.body(c["prefix"] + "base").id]
-                    elbow = d.xpos[m.body(c["prefix"] + "lower_arm").id]
-                    uv = project(m, d, c["cam"]["external"], [*pre_world, tip, base, elbow], S)
+                    base = c["origin"]
+                    elbow = d.xpos[m.jnt_bodyid[m.joint(c["prefix"] + cfg.arm_joints[2]).id]]
+                    act = np.where(e.s.active)[0]  # parked spare blocks are not part of the scene
+                    uv = project(m, d, c["cam"]["external"], [*pre_world[act], tip, base, elbow], S)
                     ok = inside(uv, S)
-                    n = len(pre_world)
-                    ext["blocks"].append(ok[:n].all()); ext["tip"].append(ok[n]); ext["base"].append(ok[n + 1]); ext["elbow"].append(ok[n + 2])
-                    ext["all"].append(ok.all())
-                    if not ok.all():
-                        worst.append((ok.mean(), env.render(i)["external"]))
+                    n = len(act)
+                    got = {"blocks": bool(ok[:n].all()), "tip": bool(ok[n]), "base": bool(ok[n + 1]), "elbow": bool(ok[n + 2])}
+                    for k, v in got.items():
+                        ext[k].append(v)
+                    cam_ext = c["cam"]["external"]
+                    ext["blocks visible"].append(all(first_hit_body(m, d, cam_ext, pre_world[k]) == m.body(c["cubes"][k]).name for k in act))
+                    hit = first_hit_body(m, d, cam_ext, tip)
+                    ext["tip visible"].append(hit.split("/", 1)[-1].startswith("grip") or hit.split("/", 1)[-1] in cfg.gripper_bodies)
+                    keep = all(got[k] for k in items)
+                    ext["all"].append(keep)
+                    if not keep:
+                        worst.append((float(np.mean(list(got.values()))), env.render(i)["external"]))
                     if pre:
                         tgt = e.s.target
                         tw = pre_world[tgt]
@@ -102,6 +131,12 @@ def main():
                         wrist["target_visible"].append(inf and visible(m, d, c["cam"]["wrist"], tw, c["cubes"][tgt]))
                         if not wrist["target_visible"][-1]:
                             worst.append((0.0, env.render(i)["wrist"]))
+                        rs.update_scene(d, camera=c["cam"]["wrist"])
+                        seg = rs.render()[..., 0]
+                        seen = {n: bool(np.isin(seg, g).mean() > 0.002) for n, g in finger_geoms[i].items()}
+                        for n, v in seen.items():
+                            fingers[n].append(v)
+                        fingers_all.append(all(seen.values()))
                 if e.phase == DONE:
                     finished[i] = True
             if all(finished):
@@ -115,8 +150,14 @@ def main():
     for k, v in wrist.items():
         if v:
             print(f"  {k:16s} {np.mean(v):6.1%}")
-    ok_ext, ok_wrist = np.mean(ext["all"]) >= a.min_external, np.mean(wrist["target_visible"]) >= a.min_wrist
-    print("EXTERNAL", "PASS" if ok_ext else "FAIL", "| WRIST", "PASS" if ok_wrist else "FAIL")
+    print("gripper fingers in the wrist view during approach/descend/grasp (more than 0.2% of the pixels):")
+    for n, v in fingers.items():
+        print(f"  {n:24s} {np.mean(v):6.1%}")
+    print(f"  {'every finger at once':24s} {np.mean(fingers_all):6.1%}")
+    ok_ext = np.mean(ext["all"]) >= a.min_external and min(np.mean(ext["blocks visible"]), np.mean(ext["tip visible"])) >= a.min_visible
+    ok_wrist = np.mean(wrist["target_visible"]) >= a.min_wrist
+    ok_fingers = np.mean(fingers_all) >= a.min_fingers
+    print("EXTERNAL", "PASS" if ok_ext else "FAIL", "| WRIST", "PASS" if ok_wrist else "FAIL", "| FINGERS", "PASS" if ok_fingers else "FAIL")
     if worst:
         worst.sort(key=lambda x: x[0])
         sel = [f for _, f in worst[:: max(1, len(worst) // 16)][:16]]
@@ -124,7 +165,7 @@ def main():
         rows = [np.concatenate(sel[r:r + 8], 1) for r in range(0, len(sel), 8)]
         imageio.imwrite("demo/camera_audit.png", np.concatenate(rows, 0))
         print("wrote demo/camera_audit.png (worst frames)")
-    raise SystemExit(0 if ok_ext and ok_wrist else 1)
+    raise SystemExit(0 if ok_ext and ok_wrist and ok_fingers else 1)
 
 
 if __name__ == "__main__":

@@ -113,13 +113,15 @@ def _add_cell(world: mujoco.MjSpec, cfg: RobotConfig, i: int, origin: np.ndarray
 
     # place pads (flat, no collision): left = +y, right = -y, as seen from the robot
     zx, zy = cfg.zone_xy
-    for sgn, side in ((1, "left"), (-1, "right")):
+    for sgn, side in (((1, "left"), (-1, "right")) if cfg.show_pads else ()):
         top.add_geom(type=mujoco.mjtGeom.mjGEOM_BOX, size=[cfg.zone_half, cfg.zone_half, 0.0006],
                      pos=[zx - cfg.table_center[0], sgn * zy - cfg.table_center[1], 0.0006],
                      rgba=[0.16, 0.2, 0.26, 1], contype=0, conaffinity=0, name=f"{p}pad_{side}")
 
-    # plain backdrop behind the robot: keeps neighbouring cells out of the external camera's view
-    wx = cfg.table_center[0] - hx - 0.03
+    # (backdrop below)
+    # plain backdrop at the far end of the external camera's view (same in every cell, so no cell sees its neighbour)
+    toward = 1.0 if cfg.external_cam_lookat[0] >= cfg.external_cam_pos[0] else -1.0
+    wx = cfg.table_center[0] + toward * (hx + 0.03)
     top.parent.add_geom(type=mujoco.mjtGeom.mjGEOM_BOX, size=[0.01, 0.9, 0.6], pos=origin + [wx, 0, 0.6 + FLOOR_Z],
                         rgba=[*cfg.backdrop_color, 1], contype=0, conaffinity=0, material="backdrop")
 
@@ -138,7 +140,7 @@ def _add_cell(world: mujoco.MjSpec, cfg: RobotConfig, i: int, origin: np.ndarray
     # cubes
     s, h = cfg.cube_half_size, cfg.block_h
     for k in range(N_CUBES):
-        b = wb.add_body(name=f"{p}cube{k}", pos=origin + [cfg.table_center[0] - hx - 0.4, -0.3 + 0.2 * k, FLOOR_Z + h + 0.001])
+        b = wb.add_body(name=f"{p}cube{k}", pos=origin + [0.0, 25.0 + k, FLOOR_Z + h + 0.001])  # parked far away (beyond the haze) until used
         b.add_freejoint(name=f"{p}cube{k}_joint")
         b.add_geom(type=mujoco.mjtGeom.mjGEOM_BOX, size=[s, s, h], mass=0.03, material="block",
                    friction=[cfg.object_friction, 0.01, 0.001], rgba=[0.8, 0.2, 0.2, 1], name=f"{p}cube{k}_geom",

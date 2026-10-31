@@ -32,6 +32,7 @@ class VLAConfig:
     film: bool = True  # text-conditioned FiLM on the last two ResNet stages (zero-initialised: starts as plain ResNet)
     text_layers: int = 2
     readout_queries: int = 4  # prompt-driven spatial-softmax readouts per camera (0 = off)
+    text: bool = True  # False: no prompt at all (no text encoder / FiLM / readouts); `tokens` is accepted and ignored
 
 
 def _sincos_2d(h: int, w: int, d: int) -> torch.Tensor:
@@ -59,7 +60,7 @@ class VLA(nn.Module):
         self.register_buffer("img_pos", _sincos_2d(fh, fh, d), persistent=False)
         ys, xs = torch.meshgrid(torch.linspace(-1, 1, fh), torch.linspace(-1, 1, fh), indexing="ij")
         self.register_buffer("grid_xy", torch.stack([xs.flatten(), ys.flatten()], 1), persistent=False)  # (N,2)
-        K = cfg.readout_queries
+        K = cfg.readout_queries if cfg.text else 0
         if K:  # the prompt asks K questions of each camera's feature map ("where is the red block?") and gets back
             self.query_proj = nn.Linear(d, K * d)  # soft coordinates + an attended feature vector per question
             self.key_proj = nn.Linear(d, d)
@@ -67,12 +68,14 @@ class VLA(nn.Module):
             self.readout_cam = nn.Parameter(torch.zeros(2, K, d))
             nn.init.normal_(self.readout_cam, std=0.02)
         self.cam_emb = nn.Parameter(torch.zeros(2, 1, d))
-        self.text_emb = nn.Embedding(cfg.vocab_size, d, padding_idx=0)
-        self.text_pos = nn.Parameter(torch.zeros(cfg.max_text, d))
-        tl = nn.TransformerEncoderLayer(d, cfg.n_heads, cfg.ff, cfg.dropout, batch_first=True, norm_first=True)
-        self.text_enc = nn.TransformerEncoder(tl, cfg.text_layers)  # the prompt gets its own encoder; token 0 (<cls>) pools it
+        if cfg.text:
+            self.text_emb = nn.Embedding(cfg.vocab_size, d, padding_idx=0)
+            self.text_pos = nn.Parameter(torch.zeros(cfg.max_text, d))
+            tl = nn.TransformerEncoderLayer(d, cfg.n_heads, cfg.ff, cfg.dropout, batch_first=True, norm_first=True)
+            self.text_enc = nn.TransformerEncoder(tl, cfg.text_layers)  # the prompt gets its own encoder; token 0 (<cls>) pools it
+            nn.init.normal_(self.text_pos, std=0.02)
         film_ch = [chans[k] for k in sorted(self.film_at)]
-        self.films = nn.ModuleList([nn.Linear(d, 2 * c) for c in film_ch]) if cfg.film else None
+        self.films = nn.ModuleList([nn.Linear(d, 2 * c) for c in film_ch]) if (cfg.film and cfg.text) else None
         for f in (self.films or []):
             nn.init.zeros_(f.weight), nn.init.zeros_(f.bias)
         self.state_proj = nn.Linear(cfg.state_dim, d)
@@ -86,7 +89,7 @@ class VLA(nn.Module):
         self.head = nn.Linear(d, cfg.action_dim)
         self.register_buffer("mean", torch.tensor([0.485, 0.456, 0.406]).view(1, 3, 1, 1), persistent=False)
         self.register_buffer("std", torch.tensor([0.229, 0.224, 0.225]).view(1, 3, 1, 1), persistent=False)
-        nn.init.normal_(self.cam_emb, std=0.02), nn.init.normal_(self.text_pos, std=0.02), nn.init.normal_(self.type_emb, std=0.02)
+        nn.init.normal_(self.cam_emb, std=0.02), nn.init.normal_(self.type_emb, std=0.02)
 
     def train(self, mode: bool = True):
         super().train(mode)
@@ -126,9 +129,14 @@ class VLA(nn.Module):
             f = torch.cat([f, self.readout(f, prompt, cam)], dim=1)
         return f
 
-    def forward(self, wrist: torch.Tensor, external: torch.Tensor, state: torch.Tensor, tokens: torch.Tensor) -> torch.Tensor:
+    def forward(self, wrist: torch.Tensor, external: torch.Tensor, state: torch.Tensor, tokens: torch.Tensor | None = None) -> torch.Tensor:
         B = state.shape[0]
         s = self.state_proj(state)[:, None] + self.type_emb[0]
+        if not self.cfg.text:  # behaviour-only model: images + joint state, no prompt
+            v = torch.cat([self.encode_image(wrist, 0), self.encode_image(external, 1)], dim=1) + self.type_emb[2]
+            mem = self.encoder(torch.cat([s, v], dim=1))
+            out = self.decoder(self.queries[None].expand(B, -1, -1), mem)
+            return self.head(self.out_norm(out))
         t, prompt = self.encode_text(tokens)
         t = t + self.type_emb[1]
         v = torch.cat([self.encode_image(wrist, 0, prompt), self.encode_image(external, 1, prompt)], dim=1) + self.type_emb[2]

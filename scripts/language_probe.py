@@ -21,7 +21,7 @@ import torch
 from robotics.data.randomize import sample_scene
 from robotics.envs.multi_cell import MultiCellEnv
 from robotics.policy.rollout import PolicyRunner, run_episodes
-from robotics.policy.train_utils import load_policy
+from robotics.policy.train_utils import load_policy, robot_for_checkpoint
 from robotics.robots.spec import load_robot
 
 
@@ -41,7 +41,7 @@ def variants(cfg, s):
 def main():
     p = argparse.ArgumentParser()
     p.add_argument("--checkpoint", required=True)
-    p.add_argument("--robot", default="so101")
+    p.add_argument("--robot", default=None, help="default: inferred from the checkpoint")
     p.add_argument("--scenes", type=int, default=40)
     p.add_argument("--cells", type=int, default=6)
     p.add_argument("--seed", type=int, default=777)
@@ -49,8 +49,8 @@ def main():
     p.add_argument("--replan", type=int, default=None)
     p.add_argument("--device", default="cuda" if torch.cuda.is_available() else "cpu")
     a = p.parse_args()
-    cfg = load_robot(a.robot)
     model, ck = load_policy(a.checkpoint, a.device)
+    cfg = load_robot(robot_for_checkpoint(ck, a.robot))
     runner = PolicyRunner(model, ck, a.device)
     env = MultiCellEnv(cfg, a.cells, model.cfg.image_size)
     rng = np.random.default_rng(a.seed)

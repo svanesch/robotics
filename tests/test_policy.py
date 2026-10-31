@@ -84,3 +84,19 @@ def test_dagger_collection_writes_a_loadable_dataset(tmp_path):
     ds = VLADataset(out, "train", chunk=16)
     item = ds[0]
     assert item["actions"].shape == (16, 6) and item["wrist"].shape == (128, 128, 3)
+
+
+def test_text_free_model_ignores_the_prompt_and_has_no_text_parameters():
+    from robotics.policy.model import VLA, VLAConfig
+
+    cfg = VLAConfig(vocab_size=len(Tokenizer()), pretrained=False, chunk=8, d_model=64, n_heads=4, enc_layers=1, dec_layers=1,
+                    ff=128, text=False)
+    m = VLA(cfg).eval()
+    assert not any(n.startswith(("text_", "film", "query_proj", "key_proj", "coord_proj")) for n, _ in m.named_parameters())
+    x, s = torch.rand(2, 3, 128, 128), torch.randn(2, 6)
+    a = torch.from_numpy(np.stack([Tokenizer().encode("pick up the red block")] * 2))
+    b = torch.from_numpy(np.stack([Tokenizer().encode("put the blue block on the left")] * 2))
+    with torch.no_grad():
+        assert torch.equal(m(x, x, s, a), m(x, x, s, b)) and torch.equal(m(x, x, s, a), m(x, x, s))
+    m.train()
+    m(x, x, s).mean().backward()

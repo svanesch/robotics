@@ -1,0 +1,466 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="color-scheme" content="dark"><meta name="theme-color" content="#0f1217">
+<meta name="apple-mobile-web-app-capable" content="yes"><meta name="apple-mobile-web-app-status-bar-style" content="black-translucent"><meta name="apple-mobile-web-app-title" content="Robotics lab">
+<title>Robotics lab</title>
+<style>
+:root { --bg:#0f1217; --side:#0b0e12; --panel:#171b22; --line:#262c36; --fg:#e8eaee; --muted:#8a94a6; --ok:#58d68d; --bad:#ff8e7a; --warn:#e0a458;
+  --collect:#4cc3a1; --dagger:#e0a458; --train:#7aa2f7; --eval:#c792ea; --so101:#7aa2f7; --ur5e:#4cc3a1;
+  --mono: ui-monospace, "SF Mono", "SFMono-Regular", Menlo, Consolas, monospace; }
+* { box-sizing:border-box; } [hidden] { display:none !important; }
+html, body { margin:0; background:var(--bg); color:var(--fg); font:14px/1.5 system-ui, -apple-system, "Segoe UI", sans-serif; -webkit-text-size-adjust:100%; }
+main > *, .content { min-width:0; } body { overflow-x:hidden; }
+a { color:inherit; text-decoration:none; }
+.app { display:grid; grid-template-columns:268px 1fr; min-height:100vh; }
+nav { background:var(--side); border-right:1px solid var(--line); padding:18px 12px; position:sticky; top:0; height:100vh; overflow-y:auto; display:flex; flex-direction:column; gap:2px; }
+.brand { font-weight:600; font-size:17px; padding:2px 10px 14px; } .brand small { display:block; color:var(--muted); font-weight:400; font-size:11px; letter-spacing:.04em; }
+.nav-head { font-size:11px; color:var(--muted); text-transform:uppercase; letter-spacing:.09em; padding:16px 10px 6px; }
+.item { display:flex; align-items:center; gap:10px; padding:8px 10px; border-radius:8px; color:#c9cfda; min-width:0; }
+.item:hover { background:#141922; } .item.active { background:#1b2230; color:#fff; box-shadow:inset 2px 0 0 var(--train); }
+.item .t { flex:1; min-width:0; } .item .rn { display:block; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; font-weight:500; }
+.item .sub { display:block; color:var(--muted); font:11px var(--mono); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.dot { width:8px; height:8px; border-radius:50%; background:var(--c, var(--muted)); flex:none; position:relative; }
+.dot.run { background:var(--ok); } .dot.run::after { content:""; position:absolute; inset:-5px; border-radius:50%; border:2px solid var(--ok); opacity:0; animation:pulse 1.8s ease-out infinite; }
+@keyframes pulse { 0% { transform:scale(.4); opacity:.9; } 100% { transform:scale(1.5); opacity:0; } }
+@media (prefers-reduced-motion: reduce) { .dot.run::after { animation:none; } }
+.badge { background:var(--ok); color:#0b0e12; font:600 11px var(--mono); padding:0 7px; border-radius:9px; }
+.content { min-width:0; }
+header { display:flex; flex-wrap:wrap; gap:10px 30px; align-items:center; justify-content:space-between; padding:14px 26px; border-bottom:1px solid var(--line); }
+header h1 { margin:0; font-size:15px; font-weight:600; } header h1 small { color:var(--muted); font-weight:400; margin-left:10px; font-size:12px; }
+.gauges { display:flex; flex-wrap:wrap; gap:8px 20px; } .g { min-width:104px; }
+.g .l { display:flex; justify-content:space-between; gap:10px; font-size:10px; color:var(--muted); text-transform:uppercase; letter-spacing:.06em; } .g .l b { color:var(--fg); font:500 11px var(--mono); }
+.g .bar { height:4px; background:var(--line); border-radius:2px; margin-top:3px; overflow:hidden; } .g .bar i { display:block; height:100%; background:var(--muted); transition:width .6s; }
+main { padding:24px 26px 56px; display:flex; flex-direction:column; gap:28px; }
+h2 { margin:0 0 12px; font-size:12px; color:var(--muted); text-transform:uppercase; letter-spacing:.09em; font-weight:600; }
+h3 { margin:0 0 8px; font-size:15px; font-weight:600; }
+.grid { display:grid; grid-template-columns:repeat(auto-fill, minmax(min(100%, 520px), 1fr)); gap:16px; }
+.card.train { grid-column:1 / -1; display:grid; grid-template-columns:minmax(min(100%, 380px), .9fr) minmax(0, 1.6fr); grid-template-areas:"top top" "prog views" "metrics views" "sparks views" "meta meta"; grid-template-rows:auto auto auto 1fr auto; gap:12px 24px; align-items:start; }
+.card.train .top { grid-area:top; } .card.train .prog { grid-area:prog; } .card.train .metrics { grid-area:metrics; } .card.train .sparks { grid-area:sparks; }
+.card.train .views { grid-area:views; display:grid; grid-template-columns:repeat(auto-fit, minmax(min(100%, 340px), 1fr)); gap:14px; align-content:start; } .card.train .meta { grid-area:meta; }
+@media (max-width:1100px) { .card.train { display:flex; } }
+.gal figure.v { overflow-x:auto; -webkit-overflow-scrolling:touch; } @media (max-width:700px) { .gal figure.v img { min-width:780px; } }
+.vgrid { display:grid; grid-template-columns:repeat(auto-fill, minmax(min(100%, 420px), 1fr)); gap:14px; }
+.vid { background:var(--panel); border:1px solid var(--line); border-radius:10px; overflow:hidden; } .vid video { width:100%; display:block; background:#000; aspect-ratio:3 / 2; }
+.vid .cap { padding:8px 12px; font:12px var(--mono); display:flex; flex-wrap:wrap; gap:2px 12px; color:var(--muted); } .vid .cap b { font-weight:600; }
+.vid.ok { box-shadow:inset 0 3px 0 var(--ok); } .vid.fail { box-shadow:inset 0 3px 0 var(--bad); } .vid.ok .cap b { color:var(--ok); } .vid.fail .cap b { color:var(--bad); }
+.seg { display:inline-flex; border:1px solid var(--line); border-radius:7px; overflow:hidden; } .seg button { font:12px var(--mono); color:var(--muted); background:transparent; border:0; padding:5px 14px; cursor:pointer; } .seg button.on { background:#1b2230; color:var(--fg); }
+.gl { stroke:var(--line); stroke-width:1; } .gt { fill:var(--muted); font:10.5px var(--mono); }
+.card { background:var(--panel); border:1px solid var(--line); border-radius:10px; padding:14px 16px; display:flex; flex-direction:column; gap:12px; min-width:0; --c:var(--muted); }
+.card.finished { opacity:.72; } .card.finished:hover { opacity:1; }
+.top { display:flex; align-items:center; gap:10px; min-width:0; }
+.kind { font:600 11px var(--mono); letter-spacing:.06em; color:var(--c); text-transform:uppercase; border:1px solid var(--c); border-radius:4px; padding:1px 6px; flex:none; }
+.name { font-weight:600; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; flex:1; min-width:0; }
+.pill { font:500 11px var(--mono); color:var(--muted); flex:none; } .pill.running { color:var(--ok); } .pill.stopped { color:var(--bad); }
+.prog .bar { height:8px; background:var(--line); border-radius:4px; overflow:hidden; } .prog .bar i { display:block; height:100%; background:var(--c); transition:width .6s; }
+.prog .row { display:flex; justify-content:space-between; margin-top:6px; font:12px var(--mono); color:var(--muted); } .prog .row b { color:var(--fg); font-weight:500; }
+.metrics { display:grid; grid-template-columns:repeat(auto-fill, minmax(112px, 1fr)); gap:10px 14px; }
+.m .k { font-size:11px; color:var(--muted); text-transform:uppercase; letter-spacing:.05em; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; } .m .v { font:500 17px var(--mono); }
+.sparks { display:grid; grid-template-columns:repeat(auto-fit, minmax(170px, 1fr)); gap:10px; }
+.sp .k { display:flex; justify-content:space-between; font-size:11px; color:var(--muted); } .sp .k b { color:var(--fg); font:500 11px var(--mono); }
+.sp svg { width:100%; height:46px; display:block; } .sp polyline { fill:none; stroke:var(--c); stroke-width:1.6; vector-effect:non-scaling-stroke; } .sp .area { fill:var(--c); opacity:.08; stroke:none; }
+.live { position:relative; border-radius:8px; overflow:hidden; background:#000; } .live img, .live video { width:100%; display:block; }
+.live span { position:absolute; left:8px; top:6px; font:500 10px var(--mono); letter-spacing:.08em; padding:1px 6px; background:rgba(0,0,0,.6); border-radius:3px; color:#fff; } .live .tag2 { left:auto; right:8px; color:var(--muted); }
+.meta { font:11px var(--mono); color:var(--muted); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.actions button, .btn { font:500 12px var(--mono); color:var(--fg); background:transparent; border:1px solid var(--c, var(--line)); border-radius:6px; padding:5px 12px; cursor:pointer; }
+.actions button:hover, .btn:hover { background:var(--c, #222a37); color:#0f1217; } .actions small { color:var(--muted); font:11px var(--mono); margin-left:10px; }
+.views { display:flex; flex-direction:column; gap:12px; } .views figure, figure.v { margin:0; } .views img, figure.v img { width:100%; display:block; border-radius:8px; background:#000; }
+figcaption { font:11px var(--mono); color:var(--muted); margin-top:4px; }
+.chart .legend { display:flex; flex-wrap:wrap; gap:4px 16px; font:12px var(--mono); margin-bottom:4px; } .chart .legend i { display:inline-block; width:10px; height:3px; margin-right:6px; vertical-align:middle; } .chart .legend b { font-weight:500; }
+.chart .plot { position:relative; } .chart svg { width:100%; display:block; background:rgba(255,255,255,.02); border-radius:6px; }
+.chart svg polyline { fill:none; stroke-width:1.8; vector-effect:non-scaling-stroke; }
+.chart .y { position:absolute; left:6px; font:10px var(--mono); color:var(--muted); } .chart .xr { display:flex; justify-content:space-between; font:10px var(--mono); color:var(--muted); margin-top:2px; }
+.empty { color:var(--muted); padding:30px; border:1px dashed var(--line); border-radius:10px; text-align:center; } .empty code { font-family:var(--mono); color:var(--fg); }
+#offline { display:none; color:var(--bad); font:12px var(--mono); }
+
+.tiles { display:grid; grid-template-columns:repeat(auto-fit, minmax(200px, 1fr)); gap:14px; }
+.tile { background:var(--panel); border:1px solid var(--line); border-radius:10px; padding:12px 16px; } .tile .k { font-size:11px; color:var(--muted); text-transform:uppercase; letter-spacing:.06em; } .tile .v { font:500 26px var(--mono); } .tile .s { font:12px var(--mono); color:var(--muted); }
+.bars { display:flex; flex-direction:column; gap:7px; max-width:900px; }
+.brow { display:grid; grid-template-columns:150px 1fr 170px; gap:12px; align-items:center; font-size:13px; } .brow a:hover { text-decoration:underline; }
+.brow .b { height:20px; background:var(--line); border-radius:4px; overflow:hidden; } .brow .b i { display:block; height:100%; background:var(--c); }
+.brow .n { font:12px var(--mono); color:var(--muted); } .brow .n b { color:var(--fg); font-weight:500; } .brow.dim { opacity:.5; }
+.tw { overflow-x:auto; border:1px solid var(--line); border-radius:10px; }
+table { border-collapse:collapse; width:100%; min-width:900px; font-size:13px; }
+th { text-align:left; font:600 11px system-ui; letter-spacing:.06em; text-transform:uppercase; color:var(--muted); padding:9px 12px; border-bottom:1px solid var(--line); background:var(--panel); white-space:nowrap; }
+td { padding:9px 12px; border-bottom:1px solid #1d222b; font-family:var(--mono); font-size:12.5px; white-space:nowrap; } tr.row:hover td { background:#141922; cursor:pointer; }
+td.n1 { font-family:system-ui; font-weight:600; } .tag { font:600 10px var(--mono); border:1px solid var(--c); color:var(--c); border-radius:4px; padding:0 5px; margin-left:6px; }
+.dimtxt { color:var(--muted); }
+
+.rhead { display:flex; flex-wrap:wrap; gap:8px 14px; align-items:center; } .rhead h1 { margin:0; font-size:24px; font-weight:600; }
+.chips { display:flex; flex-wrap:wrap; gap:8px; } .chip { font:12px var(--mono); background:var(--panel); border:1px solid var(--line); border-radius:6px; padding:2px 9px; color:#c9cfda; }
+.two { display:grid; grid-template-columns:minmax(0, 1.1fr) minmax(0, 1fr); gap:20px; } @media (max-width:1100px) { .two { grid-template-columns:1fr; } }
+.gal { display:flex; flex-direction:column; gap:8px; } .gal .ctl { display:flex; align-items:center; gap:10px; font:12px var(--mono); color:var(--muted); }
+.evcard { background:var(--panel); border:1px solid var(--line); border-radius:10px; padding:14px 16px; display:flex; flex-direction:column; gap:12px; }
+.evtop { display:flex; flex-wrap:wrap; align-items:baseline; gap:6px 16px; } .evtop .big { font:500 30px var(--mono); } .evtop .big.good { color:var(--ok); }
+.evgrid { display:grid; grid-template-columns:repeat(auto-fit, minmax(min(100%, 440px), 1fr)); gap:16px 28px; }
+.kv { font:12px var(--mono); display:grid; grid-template-columns:minmax(120px, auto) 1fr; gap:3px 14px; } .kv span:nth-child(odd) { color:var(--muted); }
+.fun .brow { grid-template-columns:minmax(120px, 240px) minmax(80px, 1fr) auto; }
+#menu { display:none; align-items:center; justify-content:center; width:40px; height:40px; font-size:20px; color:var(--fg); background:var(--panel); border:1px solid var(--line); border-radius:9px; cursor:pointer; padding:0; }
+#scrim { display:none; position:fixed; inset:0; background:rgba(0,0,0,.55); z-index:20; }
+header { padding-left:max(26px, env(safe-area-inset-left)); padding-right:max(26px, env(safe-area-inset-right)); }
+main { padding-left:max(26px, env(safe-area-inset-left)); padding-right:max(26px, env(safe-area-inset-right)); padding-bottom:calc(56px + env(safe-area-inset-bottom)); }
+@media (max-width:1200px) and (min-width:901px) { .app { grid-template-columns:230px 1fr; } }
+@media (max-width:900px) {
+  .app { grid-template-columns:1fr; }
+  nav { position:fixed; z-index:30; left:0; top:0; bottom:0; width:min(310px, 86vw); height:100dvh; transform:translateX(-104%); transition:transform .22s ease; padding:calc(18px + env(safe-area-inset-top)) 12px calc(18px + env(safe-area-inset-bottom)) max(12px, env(safe-area-inset-left)); box-shadow:0 0 44px rgba(0,0,0,.65); }
+  body.navopen nav { transform:none; } body.navopen #scrim { display:block; } body.navopen { overflow:hidden; }
+  #menu { display:inline-flex; flex:none; }
+  header { position:sticky; top:0; z-index:10; background:var(--bg); padding-top:calc(10px + env(safe-area-inset-top)); padding-bottom:10px; padding-left:max(14px, env(safe-area-inset-left)); padding-right:max(14px, env(safe-area-inset-right)); gap:8px 14px; justify-content:flex-start; }
+  header h1 { flex:1; min-width:0; font-size:16px; } header h1 small { display:block; margin:0; }
+  .gauges { flex-basis:100%; flex-wrap:nowrap; overflow-x:auto; gap:16px; padding-bottom:2px; -webkit-overflow-scrolling:touch; } .g { flex:none; min-width:104px; }
+  main { padding-top:16px; padding-left:max(14px, env(safe-area-inset-left)); padding-right:max(14px, env(safe-area-inset-right)); gap:22px; }
+  .brow { grid-template-columns:90px 1fr auto; gap:8px; font-size:12.5px; } .fun .brow { grid-template-columns:minmax(90px, 150px) minmax(50px, 1fr) auto; }
+  .rhead h1 { font-size:21px; } .evtop .big { font-size:26px; } .tile .v { font-size:22px; }
+  .metrics { grid-template-columns:repeat(auto-fill, minmax(96px, 1fr)); } .card { padding:12px; } .evcard { padding:12px; }
+  .item { padding:12px 12px; }
+}
+@media (pointer:coarse) { .btn, .actions button, .seg button { min-height:44px; padding:8px 16px; } .item { min-height:46px; } th, td { padding-top:12px; padding-bottom:12px; } }
+@media (max-width:640px) { .hm { display:none; } table { min-width:0; } }
+@media (max-width:520px) { .tiles { grid-template-columns:1fr 1fr; } .tile { padding:10px 12px; } .grid { gap:12px; } }
+</style></head>
+<body>
+<div class="app">
+  <nav id="nav"></nav>
+  <div class="content">
+    <header><button id="menu" aria-label="Menu" type="button">☰</button><h1 id="title">Live<small id="clock"></small></h1><div class="gauges" id="gauges"></div><div id="offline">dashboard server not reachable</div></header>
+    <main id="view"></main>
+  </div>
+</div>
+<div id="scrim"></div>
+<script>
+const KIND = {collect:'var(--collect)', dagger:'var(--dagger)', train:'var(--train)', eval:'var(--eval)', auto:'#e5c07b'};
+const ROBOT = {'SO-101':'var(--so101)', 'UR5e':'var(--ur5e)'};
+const $ = (id) => document.getElementById(id);
+const isLocal = ['localhost', '127.0.0.1', '::1'].includes(location.hostname);  // opening a 3D window only works from the laptop itself
+const esc = (s) => String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const label = (k) => k.replace(/_/g, ' ');
+const fmtTime = (s) => { if (s == null || !isFinite(s)) return '-'; s = Math.round(s); const h = Math.floor(s/3600), m = Math.floor(s%3600/60), x = s%60; return h ? `${h}h ${String(m).padStart(2,'0')}m` : m ? `${m}m ${String(x).padStart(2,'0')}s` : `${x}s`; };
+function fmtVal(k, v) {
+  if (typeof v !== 'number') return String(v);
+  if (/rate|success/.test(k) && v <= 1.0001) return (v*100).toFixed(1) + '%';
+  if (Number.isInteger(v)) return v.toLocaleString();
+  return Math.abs(v) >= 100 ? v.toFixed(0) : Math.abs(v) >= 1 ? v.toFixed(2) : v.toPrecision(3);
+}
+const pct = (s, n) => n ? Math.round(100 * s / n) + '%' : '-';
+const when = (t) => new Date(t * 1000).toLocaleString([], {month:'short', day:'numeric', hour:'2-digit', minute:'2-digit'});
+
+let LIVE = {runs: [], system: [], now: 0}, HIST = [], histStr = '';
+const route = () => (location.hash || '#live').slice(1);
+
+/* ------------------------------------------------------------------ data helpers */
+function testEval(run) {  // the evaluation on the test scenes with the most episodes (latest if tied)
+  const ev = run.evals.filter(e => e.split === 'test' && e.closed_loop && e.closed_loop.all);
+  ev.sort((a, b) => (b.episodes - a.episodes) || (b.mtime - a.mtime));
+  return ev[0] || null;
+}
+const succ = (ev) => ev ? ev.closed_loop.all[0] / ev.closed_loop.all[1] : null;
+const taskRate = (ev, k) => ev && ev.closed_loop[k] ? ev.closed_loop[k] : null;
+
+/* ------------------------------------------------------------------ nav */
+function renderNav() {
+  const r = route(), alive = LIVE.runs.filter(x => x.alive).length;
+  const item = (href, name, sub, extra = '', dot = '') => `<a class="item ${r === href.slice(1) ? 'active' : ''}" href="${href}">${dot}<span class="t"><span class="rn">${name}</span>${sub ? `<span class="sub">${sub}</span>` : ''}</span>${extra}</a>`;
+  let h = `<div class="brand">Robotics lab<small>simulation · training · evaluation</small></div>`;
+  h += item('#live', 'Live', alive ? `${alive} running` : 'nothing running', alive ? `<span class="badge">${alive}</span>` : '');
+  h += item('#overview', 'Overview', 'performance of all trainings');
+  h += item('#videos', 'Showreel', HIST.filter(r => r.videos).length + ' trainings with test videos');
+  h += `<div class="nav-head">Trainings (${HIST.length})</div>`;
+  for (const run of HIST) {
+    const ev = testEval(run), s = succ(ev);
+    const sub = [run.best_val != null ? `val ${run.best_val.toFixed(3)}` : null, s != null ? `test ${Math.round(100*s)}%` : null].filter(Boolean).join(' · ') || (run.running ? 'training...' : 'no results yet');
+    h += item('#run/' + encodeURIComponent(run.name), esc(run.name), sub, '', `<span class="dot ${run.running ? 'run' : ''}" style="--c:${ROBOT[run.robot] || 'var(--muted)'}"></span>`);
+  }
+  $('nav').innerHTML = h;
+}
+
+/* ------------------------------------------------------------------ charts */
+const niceTicks = (lo, hi) => {
+  for (const mults of [[1, 1.5, 2, 3, 4, 5, 7], [1, 2, 5], [1]]) {  // as fine as the axis allows without crowding it
+    const out = []; for (let e = Math.floor(Math.log10(lo)); e <= Math.ceil(Math.log10(hi)); e++) for (const m of mults) { const v = m * 10 ** e; if (v >= lo && v <= hi) out.push(v); }
+    if (out.length <= 8) return out;
+  }
+  return [];
+};
+function ema(pts, a = 0.2) { let s = null; return pts.map(([x, y]) => [x, s = s == null ? y : s + a * (y - s)]); }
+function lossChart(items, h = 230, W = 560) {
+  /* log y-axis, the first steps (10x higher than the rest) are clipped so the interesting part is readable, training curve smoothed */
+  const L = 50, R = 12, T = 10, B = 24, pw = W - L - R, ph = h - T - B;
+  const all = items.flatMap(([, , pts]) => pts);
+  if (all.length < 2) return '<div class="dimtxt">no curve yet</div>';
+  const xs = all.map(p => p[0]), x0 = Math.min(...xs), x1 = Math.max(...xs), dx = (x1 - x0) || 1;
+  const body = all.filter(p => p[0] >= x0 + 0.05 * dx).map(p => p[1]);
+  const lo = Math.min(...all.map(p => p[1])) / 1.12, hi = Math.max(...body) * 1.12;
+  const clipped = Math.max(...all.map(p => p[1])) > hi;
+  const a = Math.log(lo), b = Math.log(hi);
+  const X = (x) => L + (x - x0) / dx * pw, Y = (v) => T + ph - (Math.min(Math.max(Math.log(v), a), b) - a) / (b - a) * ph;
+  let g = niceTicks(lo, hi).map(v => `<line x1="${L}" x2="${W - R}" y1="${Y(v).toFixed(1)}" y2="${Y(v).toFixed(1)}" class="gl"/><text x="${L - 6}" y="${(Y(v) + 3.5).toFixed(1)}" text-anchor="end" class="gt">${v < 0.1 ? v.toFixed(3) : v.toFixed(2)}</text>`).join('');
+  for (let i = 0; i <= 4; i++) { const x = x0 + dx * i / 4; g += `<text x="${X(x).toFixed(1)}" y="${h - 6}" text-anchor="${i === 0 ? 'start' : i === 4 ? 'end' : 'middle'}" class="gt">${Math.round(x)}</text>`; }
+  let lines = '', leg = '';
+  for (const [k, col, pts] of items) {
+    const poly = (p) => p.map(q => `${X(q[0]).toFixed(1)},${Y(q[1]).toFixed(1)}`).join(' ');
+    const isVal = /val/.test(k), last = pts[pts.length - 1][1];
+    if (isVal) {
+      lines += `<polyline points="${poly(pts)}" fill="none" stroke="${col}" stroke-width="2"/>` + pts.map(q => `<circle cx="${X(q[0]).toFixed(1)}" cy="${Y(q[1]).toFixed(1)}" r="3" fill="${col}"/>`).join('');
+      const best = pts.reduce((m, q) => q[1] < m[1] ? q : m, pts[0]);
+      lines += `<circle cx="${X(best[0]).toFixed(1)}" cy="${Y(best[1]).toFixed(1)}" r="6" fill="none" stroke="${col}" stroke-width="1.5"/>`;
+      leg += `<span><i style="background:${col}"></i>validation ${fmtVal(k, last)} <span class="dimtxt">(best ${fmtVal(k, best[1])} at step ${Math.round(best[0])})</span></span>`;
+    } else {
+      lines += `<polyline points="${poly(pts)}" fill="none" stroke="${col}" stroke-width="1" opacity=".3"/><polyline points="${poly(ema(pts))}" fill="none" stroke="${col}" stroke-width="2.2"/>`;
+      leg += `<span><i style="background:${col}"></i>training ${fmtVal(k, ema(pts).slice(-1)[0][1])} <span class="dimtxt">(smoothed)</span></span>`;
+    }
+  }
+  return `<div class="chart"><div class="legend">${leg}</div><svg viewBox="0 0 ${W} ${h}" style="width:100%;height:auto">${g}${lines}</svg><div class="dimtxt" style="font:10.5px var(--mono)">loss (log scale), L1 on normalised actions${clipped ? ', first steps clipped' : ''}</div></div>`;
+}
+function spark(pts) {
+  if (!pts || pts.length < 2) return '';
+  const xs = pts.map(p => p[0]), ys = pts.map(p => p[1]);
+  const x0 = Math.min(...xs), x1 = Math.max(...xs), y0 = Math.min(...ys), y1 = Math.max(...ys), dy = (y1 - y0) || 1, dx = (x1 - x0) || 1;
+  const P = pts.map(p => `${((p[0]-x0)/dx*100).toFixed(2)},${(44 - (p[1]-y0)/dy*40).toFixed(2)}`).join(' ');
+  return `<svg viewBox="0 0 100 46" preserveAspectRatio="none"><polygon class="area" points="0,46 ${P} 100,46"/><polyline points="${P}"/></svg>`;
+}
+const bar = (frac, col, extra = '') => `<div class="b"><i style="width:${Math.max(0, Math.min(1, frac)) * 100}%;background:${col}"></i></div>`;
+
+/* ------------------------------------------------------------------ live view */
+const cards = new Map();
+const VIEWS = {train: 'Training batch: wrist | external, after augmentation', val: 'Validation frames: wrist | external | truth (dim) vs prediction (bright) of the next 16 actions'};
+function makeCard(r) {
+  const el = document.createElement('div');
+  el.className = 'card'; el.style.setProperty('--c', KIND[r.kind] || 'var(--muted)');
+  el.innerHTML = `<div class="top"><span class="dot"></span><span class="kind"></span><span class="name"></span><span class="pill"></span></div>
+    <div class="prog"><div class="bar"><i></i></div><div class="row"><span class="count"></span><span class="time"></span></div></div>
+    <div class="metrics"></div><div class="sparks"></div><div class="views"></div>
+    <div class="live" hidden><img alt="latest simulator frames: wrist camera (left), external camera (right)"><video class="loopv manual" muted playsinline autoplay hidden></video><span>WRIST | EXTERNAL</span><span class="tag2"></span></div>
+    <div class="actions" hidden><button type="button">Open 3D world</button><small></small></div>
+    <div class="meta"></div>`;
+  return el;
+}
+function updateCard(el, r) {
+  el.querySelector('.dot').className = 'dot' + (r.alive ? ' run' : '');
+  el.classList.toggle('finished', !r.alive); el.classList.toggle('train', r.kind === 'train');
+  el.querySelector('.kind').textContent = r.kind; el.querySelector('.name').textContent = r.name;
+  const pill = el.querySelector('.pill'); pill.textContent = r.alive ? 'running' : r.status; pill.className = 'pill ' + (r.alive ? 'running' : r.status);
+  const total = r.total, p = total ? Math.min(100, r.progress / total * 100) : null;
+  el.querySelector('.prog .bar i').style.width = (p == null ? 0 : p) + '%';
+  el.querySelector('.count').innerHTML = total ? `<b>${fmtVal('n', Math.round(r.progress))}</b> / ${fmtVal('n', Math.round(total))} &nbsp;(${p.toFixed(0)}%)` : `<b>${fmtVal('n', Math.round(r.progress))}</b>`;
+  el.querySelector('.time').textContent = r.alive ? `elapsed ${fmtTime(r.elapsed)}  ·  ETA ${fmtTime(r.eta)}` : `took ${fmtTime(r.elapsed)}`;
+  const mhtml = Object.entries(r.metrics).map(([k, v]) => `<div class="m"><div class="k">${label(k)}</div><div class="v">${fmtVal(k, v)}</div></div>`).join('');
+  const mbox = el.querySelector('.metrics'); if (mbox.dataset.h !== mhtml) { mbox.innerHTML = mhtml; mbox.dataset.h = mhtml; }
+  const loss = [['train_l1', 'var(--train)'], ['val_l1', 'var(--warn)']].filter(([k]) => r.series[k] && r.series[k].length > 1).map(([k, c]) => [k, c, r.series[k]]);
+  const shtml = (loss.length ? lossChart(loss, 220, Math.max(300, Math.min(560, el.clientWidth - 36 || 560))) : '') + Object.entries(r.series).filter(([k]) => !loss.some(l => l[0] === k)).map(([k, pts]) => `<div class="sp"><div class="k"><span>${label(k)}</span><b>${pts.length ? fmtVal(k, pts[pts.length-1][1]) : ''}</b></div>${spark(pts)}</div>`).join('');
+  const sbox = el.querySelector('.sparks'); if (sbox.dataset.h !== shtml) { sbox.innerHTML = shtml; sbox.dataset.h = shtml; }
+  const vbox = el.querySelector('.views');
+  for (const key of ['train', 'val']) {
+    if (!(r.previews && r.previews[key])) continue;
+    let fig = vbox.querySelector(`[data-key="${key}"]`);
+    if (!fig) { fig = document.createElement('figure'); fig.dataset.key = key; fig.innerHTML = `<img alt="${VIEWS[key]}"><figcaption>${VIEWS[key]}</figcaption>`; vbox.appendChild(fig); }
+    const im = fig.querySelector('img'), t = String(r.previews[key]);
+    if (im.dataset.t !== t) { im.dataset.t = t; im.src = `/img/${encodeURIComponent(r.name)}.${key}.jpg?t=${t}`; }
+  }
+  const live = el.querySelector('.live');
+  if (r.preview_t) {
+    live.hidden = false; const img = live.querySelector('img');
+    img.dataset.name = r.name; img.dataset.live = r.alive ? '1' : '';
+    if (!img.dataset.t || (!r.alive && img.dataset.t !== String(r.preview_t))) { img.dataset.t = String(r.preview_t); img.src = `/img/${encodeURIComponent(r.name)}.jpg?t=${r.preview_t}`; }
+    const lv = live.querySelector('.loopv'), stale = !r.alive || r.age > 8;  // no new feed: loop the last few seconds instead of a frozen frame
+    if (r.loop_t && stale) {
+      lv.hidden = false; img.hidden = true;
+      const url = `/loop/${encodeURIComponent(r.name)}.loop.mp4?t=${r.loop_t}`;
+      if (!lv.dataset.t) { lv.dataset.t = String(r.loop_t); lv.src = url; lv.play().catch(() => {}); }
+      else if (lv.dataset.t !== String(r.loop_t)) { lv.dataset.pending = url; lv.dataset.pendingT = String(r.loop_t); }  // switch when the current loop has finished
+      live.querySelector('.tag2').textContent = 'no live feed: looping the last seconds';
+    } else { lv.hidden = true; img.hidden = false; live.querySelector('.tag2').textContent = r.alive ? 'live' : 'last frame'; }
+  } else live.hidden = true;
+  const act = el.querySelector('.actions'); act.hidden = !r.has_state || !isLocal; act.dataset.name = r.name;
+  el.querySelector('.meta').textContent = Object.entries(r.meta).map(([k, v]) => `${k}: ${v}`).join('   ');
+}
+let idlePending = null;
+function buildIdle(latest) {
+  const ir = $('idlereel');
+  ir.innerHTML = videoSection(latest, `Nothing running: newest test videos, looping (${esc(latest.name)})`, 'all', true);
+  ir.dataset.sig = latest.name + ':' + latest.videos.mtime;
+  ir.querySelectorAll('video').forEach(v => v.play().catch(() => {}));
+}
+// 'manual' videos loop by hand: when a clip ends, a newer one (if there is one) takes over, otherwise it restarts
+document.addEventListener('ended', (ev) => {
+  const v = ev.target;
+  if (!(v instanceof HTMLVideoElement) || !v.classList.contains('manual')) return;
+  if (v.closest('#idlereel') && idlePending) { const n = idlePending; idlePending = null; buildIdle(n); return; }
+  if (v.dataset.pending) { v.src = v.dataset.pending; v.dataset.t = v.dataset.pendingT; delete v.dataset.pending; delete v.dataset.pendingT; }
+  else v.currentTime = 0;
+  v.play().catch(() => {});
+}, true);
+function renderLive() {
+  if (!$('running')) {
+    cards.clear();
+    $('view').innerHTML = `<section><h2>Running</h2><div class="grid" id="running"></div></section><section id="idlereel"></section><section id="recent-section"><h2>Recent jobs</h2><div class="grid" id="recent"></div></section>`;
+  }
+  const seen = new Set();
+  for (const r of LIVE.runs) {
+    seen.add(r.name);
+    let el = cards.get(r.name);
+    if (!el) { el = makeCard(r); cards.set(r.name, el); }
+    updateCard(el, r);
+    const host = $(r.alive ? 'running' : 'recent');
+    if (el.parentElement !== host) host.appendChild(el);
+  }
+  for (const [name, el] of cards) if (!seen.has(name)) { el.remove(); cards.delete(name); }
+  const none = !LIVE.runs.some(r => r.alive), run = $('running'), em = run.querySelector('.empty');
+  if (none && !em) run.insertAdjacentHTML('afterbegin', '<div class="empty">Nothing is running.<br>Start a job (<code>pixi run collect</code>, <code>pixi run train</code>, <code>pixi run evaluate</code>) and it appears here.<br>Finished trainings are in the sidebar.</div>');
+  if (!none && em) em.remove();
+  $('recent-section').hidden = !LIVE.runs.some(r => !r.alive);
+  // nothing running: play the newest test videos in a loop instead of leaving the screen empty
+  const ir = $('idlereel'), latest = HIST.filter(x => x.videos && x.videos.episodes.length).sort((a, b) => b.videos.mtime - a.videos.mtime)[0];
+  if (none && latest) {
+    const sig = latest.name + ':' + latest.videos.mtime;
+    if (!ir.dataset.sig) buildIdle(latest);
+    else idlePending = ir.dataset.sig !== sig ? latest : null;  // newer videos wait until the current loop has finished
+    ir.hidden = false;
+  } else { ir.hidden = true; ir.innerHTML = ''; ir.dataset.sig = ''; idlePending = null; }
+}
+
+/* ------------------------------------------------------------------ overview */
+function renderOverview() {
+  const rows = HIST.map(run => ({run, ev: testEval(run)}));
+  const withTest = rows.filter(x => x.ev);
+  const best = withTest.slice().sort((a, b) => succ(b.ev) - succ(a.ev))[0];
+  const chrono = HIST.slice().reverse();
+  let h = `<section><h2>Overall performance</h2><div class="tiles">
+    <div class="tile"><div class="k">Best test success</div><div class="v">${best ? Math.round(100 * succ(best.ev)) + '%' : '-'}</div><div class="s">${best ? esc(best.run.name) + ' · ' + best.ev.closed_loop.all[0] + '/' + best.ev.closed_loop.all[1] + ' scenes' : 'no test evaluation yet'}</div></div>
+    <div class="tile"><div class="k">Trainings</div><div class="v">${HIST.length}</div><div class="s">${HIST.filter(r => r.running).length} running now</div></div>
+    <div class="tile"><div class="k">Evaluations</div><div class="v">${HIST.reduce((n, r) => n + r.evals.length, 0)}</div><div class="s">${withTest.length} trainings have a test run</div></div>
+    <div class="tile"><div class="k">Latest training</div><div class="v" style="font-size:20px">${HIST[0] ? esc(HIST[0].name) : '-'}</div><div class="s">${HIST[0] ? when(HIST[0].mtime) : ''}</div></div></div></section>`;
+  h += `<section><h2>Closed-loop success on the test scenes, oldest to newest</h2><div class="bars">` + (chrono.map(run => {
+    const ev = testEval(run), s = succ(ev), c = ROBOT[run.robot] || 'var(--muted)';
+    return `<div class="brow ${ev ? '' : 'dim'}"><a href="#run/${encodeURIComponent(run.name)}">${esc(run.name)} <span class="tag" style="--c:${c}">${run.robot}</span></a>${ev ? bar(s, c) : '<div class="b"></div>'}<span class="n">${ev ? `<b>${Math.round(100*s)}%</b> (${ev.closed_loop.all[0]}/${ev.closed_loop.all[1]})` : 'no test run'}</span></div>`;
+  }).join('') || '<div class="empty">No trainings found under runs/</div>') + `</div></section>`;
+  const cell = (ev, k) => { const t = taskRate(ev, k); return t ? `${pct(t[0], t[1])} <span class="dimtxt">${t[0]}/${t[1]}</span>` : '<span class="dimtxt">-</span>'; };
+  h += `<section><h2>All trainings</h2><div class="tw"><table><thead><tr><th>Run</th><th>Robot</th><th class="hm">Prompt</th><th class="hm">Steps</th><th>Best val L1</th><th>Test success</th><th class="hm">Lift</th><th class="hm">Place left</th><th class="hm">Place right</th><th class="hm">Date</th></tr></thead><tbody>` +
+    rows.map(({run, ev}) => `<tr class="row" onclick="location.hash='#run/${encodeURIComponent(run.name)}'"><td class="n1">${esc(run.name)}${run.running ? '<span class="tag" style="--c:var(--ok)">running</span>' : ''}</td><td>${run.robot}</td><td class="hm">${run.text ? 'text' : 'none'}</td><td class="hm">${run.last_step}${run.steps_cfg ? ' / ' + run.steps_cfg : ''}</td><td>${run.best_val != null ? run.best_val.toFixed(4) : '-'}</td><td>${ev ? `<b>${pct(ev.closed_loop.all[0], ev.closed_loop.all[1])}</b> <span class="dimtxt">${ev.closed_loop.all[0]}/${ev.closed_loop.all[1]}</span>` : '<span class="dimtxt">-</span>'}</td><td class="hm">${cell(ev, 'lift')}</td><td class="hm">${cell(ev, 'place_left')}</td><td class="hm">${cell(ev, 'place_right')}</td><td class="dimtxt hm">${when(run.mtime)}</td></tr>`).join('') + `</tbody></table></div></section>`;
+  $('view').innerHTML = h;
+}
+
+/* ------------------------------------------------------------------ videos */
+let reelFilter = 'all';
+function videoSection(run, title, filter = 'all', manual = false) {
+  const v = run.videos;
+  if (!v || !v.episodes.length) return `<section><h2>${title}</h2><div class="empty">No test videos yet.<br>Record them with <code>pixi run python scripts/record_videos.py --run ${esc(run.name)}</code></div></section>`;
+  const eps = v.episodes.filter(e => filter === 'all' || (filter === 'ok') === e.success);
+  const n = v.episodes.length, ok = v.episodes.filter(e => e.success).length;
+  return `<section><h2>${title}</h2><div class="dimtxt" style="margin:-6px 0 12px;font:12px var(--mono)">the first ${n} test scenes, not hand-picked: ${ok} of ${n} succeeded · checkpoint step ${v.checkpoint_step} · left: 3D world, right: wrist and external camera of the policy</div><div class="vgrid">` +
+    (eps.map(e => `<div class="vid ${e.success ? 'ok' : 'fail'}"><video src="/video/${encodeURIComponent(run.name)}/${e.file}?t=${Math.round(v.mtime)}" autoplay ${manual ? 'class="manual"' : 'loop'} muted playsinline controls preload="auto"></video><div class="cap"><b>${e.success ? 'SUCCESS' : 'FAIL'}</b><span>${e.steps} steps</span><span>${esc(e.instruction)}</span></div></div>`).join('') || '<div class="dimtxt">none in this filter</div>') + `</div></section>`;
+}
+function renderReel() {
+  const withV = HIST.filter(r => r.videos && r.videos.episodes.length);
+  const btn = (k, t) => `<button data-reel="${k}" class="${reelFilter === k ? 'on' : ''}">${t}</button>`;
+  let h = `<div class="rhead"><h1>Showreel</h1><div class="seg">${btn('all', 'all')}${btn('ok', 'successes')}${btn('fail', 'failures')}</div></div>`;
+  h += withV.length ? withV.map(r => { const ev = testEval(r), s = succ(ev); return `<div><div class="rhead" style="margin-bottom:6px"><h3 style="margin:0"><a href="#run/${encodeURIComponent(r.name)}">${esc(r.name)}</a></h3><span class="tag" style="--c:${ROBOT[r.robot] || 'var(--muted)'}">${r.robot}</span>${s != null ? `<span class="chip">test success ${Math.round(100 * s)}%</span>` : ''}</div>${videoSection(r, '', reelFilter)}</div>`; }).join('') : '<div class="empty">No test videos recorded yet.<br>Run <code>pixi run python scripts/record_videos.py --run NAME</code>.</div>';
+  $('view').innerHTML = h;
+  document.querySelectorAll('video').forEach(v => v.play().catch(() => {}));
+}
+/* ------------------------------------------------------------------ one training */
+const gal = {};  // gallery position per run
+function evalCard(ev) {
+  const cl = ev.closed_loop, all = cl.all, s = all ? all[0] / all[1] : null, b = ev.behaviour;
+  const order = ['lift', 'place_left', 'place_right'], tasks = Object.entries(cl).filter(([k]) => order.includes(k)).sort((a, b) => order.indexOf(a[0]) - order.indexOf(b[0]));
+  const others = Object.entries(cl).filter(([k]) => k !== 'all' && !['lift', 'place_left', 'place_right'].includes(k));
+  let h = `<div class="evcard"><div class="evtop"><span class="big ${s >= 0.5 ? 'good' : ''}">${s != null ? Math.round(100*s) + '%' : '-'}</span><span><b>${esc(ev.split)}</b> scenes · ${ev.episodes ?? '?'} episodes${ev.step != null ? ' · checkpoint step ' + ev.step : ''}${ev.tag ? ' · ' + esc(ev.tag) : ''}</span><span class="dimtxt">${when(ev.mtime)}</span></div><div class="evgrid">`;
+  if (tasks.length) h += `<div><h2>Success per task</h2><div class="bars fun">${tasks.map(([k, v]) => `<div class="brow"><span>${label(k)}</span>${bar(v[0] / v[1], 'var(--train)')}<span class="n"><b>${pct(v[0], v[1])}</b> (${v[0]}/${v[1]})</span></div>`).join('')}</div></div>`;
+  if (b) {
+    const n = b.episodes, steps = [['reached within 4 cm of the target', b.within_4cm_requested], ['closed the gripper on the target', b.grasp_requested], ['lifted the target', b.lifted_requested], ['completed the task', all ? all[0] : 0]];
+    h += `<div><h2>Where episodes are lost</h2><div class="bars fun">${steps.map(([k, v]) => `<div class="brow"><span>${k}</span>${bar(v / n, 'var(--ur5e)')}<span class="n"><b>${v}</b> / ${n}</span></div>`).join('')}</div><div class="kv" style="margin-top:8px"><span>closed on a wrong block</span><span>${b.grasp_other}</span><span>closed on nothing</span><span>${b.grasp_neither}</span><span>closest approach (median)</span><span>${b.median_closest_cm_requested.toFixed(1)} cm to target, ${b.median_closest_cm_other.toFixed(1)} cm to others</span></div></div>`;
+  }
+  if (ev.failure_breakdown) h += `<div><h2>Why episodes failed</h2><div class="kv">${Object.entries(ev.failure_breakdown).map(([k, v]) => `<span>${esc(k)}</span><span>${v}</span>`).join('')}</div></div>`;
+  if (others.length) h += `<div><h2>Slices</h2><div class="kv">${others.map(([k, v]) => `<span>${esc(label(k))}</span><span>${pct(v[0], v[1])} (${v[0]}/${v[1]})</span>`).join('')}</div></div>`;
+  return h + `</div></div>`;
+}
+function renderRun(name) {
+  const run = HIST.find(r => r.name === name);
+  if (!run) { $('view').innerHTML = `<div class="empty">No training called <code>${esc(name)}</code> yet.</div>`; return; }
+  const c = ROBOT[run.robot] || 'var(--muted)';
+  const loss = [['train_l1', 'var(--train)', run.series.train_l1], ['val_l1', 'var(--warn)', run.series.val_l1]].filter(x => x[2] && x[2].length > 1);
+  const vals = run.views.filter(v => v.kind === 'val').sort((a, b) => (a.step ?? 1e12) - (b.step ?? 1e12));
+  const idx = Math.min(gal[name] ?? vals.length - 1, vals.length - 1);
+  const cur = vals[idx], tr = cur && run.views.find(v => v.kind === 'train' && v.step === cur.step) || (cur && run.views.find(v => v.kind === 'train' && v.step === null));
+  const img = (v) => `/runimg/${encodeURIComponent(name)}/${v.file}?t=${Math.round(run.mtime)}`;
+  const cfg = Object.entries(run.config).map(([k, v]) => `<span>${esc(k)}</span><span>${esc(typeof v === 'object' ? JSON.stringify(v) : v)}</span>`).join('');
+  let h = `<div class="rhead"><h1>${esc(name)}</h1><span class="tag" style="--c:${c}">${run.robot}</span>${run.running ? '<span class="tag" style="--c:var(--ok)">running</span>' : ''}</div>
+    <div class="chips"><span class="chip">prompt: ${run.text ? 'text' : 'none'}</span><span class="chip">steps ${run.last_step}${run.steps_cfg ? ' / ' + run.steps_cfg : ''}</span><span class="chip">best val L1 ${run.best_val != null ? run.best_val.toFixed(4) : '-'}</span><span class="chip">${esc(run.dataset)}</span><span class="chip">${when(run.mtime)}</span></div>
+    <section><h2>Training and validation loss</h2><div class="card" style="--c:${c}">${lossChart(loss, innerWidth < 700 ? 240 : 300, Math.max(300, Math.min(1000, $('view').clientWidth - 40)))}</div></section>
+    <section><h2>Validation samples</h2>`;
+  if (cur) {
+    h += `<div class="two"><div class="gal"><div class="ctl"><button class="btn" data-g="-1">◀</button><button class="btn" data-g="1">▶</button><span>${cur.step == null ? 'best checkpoint' : 'step ' + cur.step} · ${idx + 1} of ${vals.length}</span></div><figure class="v"><img src="${img(cur)}" alt="validation frames with truth and predicted actions"><figcaption>${VIEWS.val}</figcaption></figure></div>${tr ? `<figure class="v"><img src="${img(tr)}" alt="training batch"><figcaption>${tr.step == null ? 'Training frames' : 'Training batch at step ' + tr.step}: wrist | external</figcaption></figure>` : '<div></div>'}</div>`;
+  } else h += `<div class="empty">No validation samples saved for this training.<br>Create them with <code>pixi run python scripts/make_views.py --run ${esc(name)}</code> (new trainings save them automatically).</div>`;
+  h += `</section>${videoSection(run, 'Test videos (loop)')}<section><h2>Evaluations on test and validation scenes</h2><div style="display:flex;flex-direction:column;gap:14px">`;
+  const evs = run.evals.slice().sort((a, b) => b.mtime - a.mtime);
+  h += evs.length ? evs.map(evalCard).join('') : `<div class="empty">No evaluation yet. Run <code>pixi run evaluate --checkpoint runs/${esc(name)}/best.pt --split test</code>.</div>`;
+  h += `</div></section>`;
+  if (run.probe) h += `<section><h2>Language probe (matched scenes)</h2><div class="evcard"><div class="kv">${Object.entries(run.probe).map(([k, v]) => `<span>${esc(label(k))}</span><span>${typeof v === 'number' ? (Number.isInteger(v) ? v : v <= 1 && !/shift/.test(k) ? (100*v).toFixed(1) + '%' : v.toFixed(3)) : v}</span>`).join('')}</div></div></section>`;
+  h += `<section><h2>Configuration</h2><div class="evcard"><div class="kv">${cfg || '<span>none</span>'}</div></div></section>`;
+  $('view').innerHTML = h;
+  document.querySelectorAll('video').forEach(v => v.play().catch(() => {}));
+}
+
+/* ------------------------------------------------------------------ routing, polling */
+let lastSig = '';
+function render(force = false) {
+  const r = route();
+  $('title').firstChild.textContent = r === 'live' ? 'Live' : r === 'overview' ? 'Overview' : r === 'videos' ? 'Showreel' : decodeURIComponent(r.replace('run/', ''));
+  renderNav();
+  if (r === 'live') { lastSig = ''; renderLive(); return; }
+  const sig = r + '|' + histStr;
+  if (sig === lastSig && !force) return;
+  lastSig = sig; cards.clear();
+  if (r === 'overview') renderOverview(); else if (r === 'videos') renderReel(); else if (r.startsWith('run/')) renderRun(decodeURIComponent(r.slice(4))); else location.hash = '#live';
+}
+$('menu').addEventListener('click', () => document.body.classList.toggle('navopen'));
+$('scrim').addEventListener('click', () => document.body.classList.remove('navopen'));
+window.addEventListener('hashchange', () => { document.body.classList.remove('navopen'); $('view').innerHTML = ''; lastSig = ''; render(true); window.scrollTo(0, 0); });
+document.addEventListener('click', async (ev) => {
+  const b = ev.target.closest('.actions button');
+  if (b) {
+    const box = b.parentElement, note = box.querySelector('small'); note.textContent = 'opening...';
+    try { const r = await fetch('/watch?name=' + encodeURIComponent(box.dataset.name), {method: 'POST'}); note.textContent = (await r.json()).message; }
+    catch (e) { note.textContent = 'could not reach the server'; }
+    return;
+  }
+  const rb = ev.target.closest('[data-reel]');
+  if (rb) { reelFilter = rb.dataset.reel; renderReel(); return; }
+  const g = ev.target.closest('[data-g]');
+  if (g) {
+    const name = decodeURIComponent(route().slice(4)), run = HIST.find(r => r.name === name), n = run.views.filter(v => v.kind === 'val').length;
+    gal[name] = Math.max(0, Math.min(n - 1, (gal[name] ?? n - 1) + Number(g.dataset.g))); renderRun(name);
+  }
+});
+async function pollLive() {
+  if (document.hidden) return;
+  try {
+    const r = await fetch('/api', {cache: 'no-store'}); LIVE = await r.json(); $('offline').style.display = 'none';
+    $('clock').textContent = new Date(LIVE.now * 1000).toLocaleString();
+    const gh = LIVE.system.map(g => `<div class="g"><div class="l"><span>${g.name}</span><b>${g.text}</b></div><div class="bar"><i style="width:${Math.min(100, g.pct)}%"></i></div></div>`).join('');
+    if ($('gauges').dataset.h !== gh) { $('gauges').innerHTML = gh; $('gauges').dataset.h = gh; }
+    if (route() === 'live') render(); else renderNav();
+  } catch (e) { $('offline').style.display = 'block'; }
+}
+async function pollHist() {
+  if (document.hidden) return;
+  try {
+    const r = await fetch('/api/history', {cache: 'no-store'}), t = await r.text();
+    if (t !== histStr) { histStr = t; HIST = JSON.parse(t); render(); }
+  } catch (e) { /* the live poll shows the offline notice */ }
+}
+// live camera frames: ~5 per second, decoded off-screen and swapped in when ready (no flicker)
+let framesBusy = false;
+function frames() {
+  if (document.hidden || framesBusy || route() !== 'live') return;
+  const imgs = [...document.querySelectorAll('.live img[data-live="1"]')];
+  if (!imgs.length) return;
+  framesBusy = true; let left = imgs.length;
+  for (const img of imgs) {
+    const n = new Image(); const done = () => { if (--left === 0) framesBusy = false; };
+    n.onload = () => { img.src = n.src; done(); }; n.onerror = done;
+    n.src = `/img/${encodeURIComponent(img.dataset.name)}.jpg?t=${Date.now()}`;
+  }
+}
+render(); pollHist(); pollLive();
+setInterval(pollLive, 1000); setInterval(pollHist, 6000); setInterval(frames, 200);
+document.addEventListener('visibilitychange', () => { if (!document.hidden) { pollLive(); pollHist(); } });
+</script></body></html>

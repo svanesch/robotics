@@ -14,8 +14,9 @@ from robotics.data.randomize import sample_scene
 from robotics.envs.multi_cell import MultiCellEnv
 from robotics.policy.data import VLADataset
 from robotics.policy.rollout import PolicyRunner, run_episodes
-from robotics.policy.train_utils import load_policy, to_device
+from robotics.policy.train_utils import load_policy, robot_for_checkpoint, to_device
 from robotics.robots.spec import load_robot
+from robotics.status import StatusReporter
 
 
 @torch.no_grad()
@@ -41,8 +42,8 @@ def main():
     p = argparse.ArgumentParser()
     p.add_argument("--checkpoint", required=True)
     p.add_argument("--dataset", default=None, help="default: the dataset the checkpoint was trained on")
-    p.add_argument("--robot", default="so101")
-    p.add_argument("--split", default="test", choices=["val", "test"])
+    p.add_argument("--robot", default=None, help="default: inferred from the checkpoint")
+    p.add_argument("--split", default="test", choices=["train", "val", "test"])
     p.add_argument("--episodes", type=int, default=150)
     p.add_argument("--cells", type=int, default=6)
     p.add_argument("--offline-frames", type=int, default=3000)
@@ -61,11 +62,14 @@ def main():
     print(f"offline mean abs action error on '{a.split}' (rad; last = gripper in [0,1]):")
     for t, v in off.items():
         print(f"  {t:12s} {v}")
-    cfg = load_robot(a.robot)
+    cfg = load_robot(robot_for_checkpoint(ck, a.robot))
     rng = np.random.default_rng(a.seed)
     env = MultiCellEnv(cfg, a.cells, model.cfg.image_size)
     scenes = [sample_scene(cfg, rng, split=a.split) for _ in range(a.episodes)]
-    res = run_episodes(runner, env, scenes, ens_m=a.ens_m, replan=a.replan)
+    rep = StatusReporter("eval", f"eval-{Path(a.checkpoint).parent.name}-{a.split}{a.tag}", total=len(scenes),
+                         meta={"robot": cfg.name, "checkpoint": a.checkpoint, "split": a.split, "cells": a.cells})
+    res = run_episodes(runner, env, scenes, ens_m=a.ens_m, replan=a.replan, status=rep)
+    rep.finish("done", success_rate=float(np.mean([r.success for r in res])))
     rows = collections.defaultdict(lambda: [0, 0])
     for r in res:
         for key in ("all", r.task, "held-out combos" if r.held_out else "seen combos"):

@@ -19,8 +19,9 @@ from robotics.data.expert import DONE, PickExpert
 from robotics.data.randomize import sample_scene
 from robotics.envs.multi_cell import CAMERAS, MultiCellEnv
 from robotics.policy.rollout import PolicyRunner, TemporalEnsemble
-from robotics.policy.train_utils import load_policy
+from robotics.policy.train_utils import load_policy, robot_for_checkpoint
 from robotics.robots.spec import load_robot
+from robotics.status import StatusReporter
 from robotics.sim.kinematics import ArmIK
 
 MIN_STEPS = 25
@@ -28,9 +29,10 @@ MIN_STEPS = 25
 
 def collect_dagger(checkpoint: str, out: str, episodes: int, cells: int = 8, seed: int = 0, policy_prob_full: float = 0.3,
                    handover_range: tuple[int, int] = (30, 230), max_steps: int = 480, device: str = "cuda",
-                   ens_m: float = 0.01, replan: int | None = None, robot: str = "so101") -> dict:
-    cfg = load_robot(robot)
+                   ens_m: float = 0.01, replan: int | None = None, robot: str | None = None) -> dict:
     model, ck = load_policy(checkpoint, device)
+    robot = robot_for_checkpoint(ck, robot)  # the robot the policy was trained for
+    cfg = load_robot(robot)
     runner = PolicyRunner(model, ck, device)
     size = model.cfg.image_size
     env = MultiCellEnv(cfg, cells, size)
@@ -42,6 +44,7 @@ def collect_dagger(checkpoint: str, out: str, episodes: int, cells: int = 8, see
     tokens = np.zeros((cells, model.cfg.max_text), np.int64)
     bufs: list[dict] = [{} for _ in range(cells)]
     steps, handover, split = [0] * cells, [0] * cells, ["train"] * cells
+    rep = StatusReporter("dagger", f"dagger-{Path(out).name}", total=episodes, meta={"robot": robot, "policy": str(checkpoint), "cells": cells})
     stats = {"episodes": 0, "frames": 0, "policy_frames": 0, "cut_unconfident": 0, "expert_success": 0}
 
     def start(i: int) -> None:
@@ -66,6 +69,8 @@ def collect_dagger(checkpoint: str, out: str, episodes: int, cells: int = 8, see
             stats["frames"] += len(ep["state"])
             stats["policy_frames"] += int(min(handover[i], steps[i]))
             stats["expert_success"] += int(experts[i].success)
+            rep.update(progress=stats["episodes"], frames=stats["frames"], policy_frames=stats["policy_frames"],
+                       expert_success=stats["expert_success"], cut_no_label=stats["cut_unconfident"])
         if stats["episodes"] < episodes:
             start(i)
         else:
@@ -81,6 +86,7 @@ def collect_dagger(checkpoint: str, out: str, episodes: int, cells: int = 8, see
             imgs.setdefault(i, imgs[live[0]])
         pred = runner.predict(np.stack([imgs[i]["wrist"] for i in range(cells)]), np.stack([imgs[i]["external"] for i in range(cells)]),
                               np.stack([env.state(i) for i in range(cells)]), tokens)
+        rep.preview(np.concatenate([imgs[live[0]]["wrist"], imgs[live[0]]["external"]], 1))
         actions = np.tile(np.append(env.home, 0.0), (cells, 1))
         finished = []
         for i in live:
@@ -101,10 +107,12 @@ def collect_dagger(checkpoint: str, out: str, episodes: int, cells: int = 8, see
             if done or steps[i] >= max_steps:
                 finished.append(i)
         env.step(actions)
+        rep.snapshot(env.model, env.data)
         for i in finished:
             finish(i)
         if stats["episodes"] and stats["episodes"] % 20 == 0:
             pass
     writer.finalize()
+    rep.finish("done")
     stats["seconds"] = time.time() - t0
     return stats

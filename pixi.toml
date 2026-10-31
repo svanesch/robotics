@@ -39,3 +39,5 @@ run-policy = "python scripts/run_policy.py"
 demo = { cmd = "python scripts/run_policy.py --interactive", env = { MUJOCO_GL = "glfw" } }
 inspect-data = "python scripts/inspect_dataset.py"
 benchmark = "python scripts/benchmark.py"
+dashboard = "python scripts/dashboard.py"
+watch = { cmd = "python scripts/watch.py", env = { MUJOCO_GL = "glfw" } }

@@ -22,7 +22,7 @@ wrist_cam:
   fovy: 80
 external_cam_pos: [0.55, 0.0, 0.4]
 external_cam_lookat: [0.15, 0.0, 0.1]
-external_cam_fovy: 60
+external_cam_fovy: 66
 cube_half_size: 0.0125
 cube_half_height: 0.03
 workspace_x: [0.17, 0.28]

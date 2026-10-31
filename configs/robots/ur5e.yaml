@@ -20,14 +20,25 @@ tool_axis: [0, 0, 1]
 grasp_axis: [0, 1, 0]
 wrist_cam:
   body: grip_base
-  pos: [0.07, 0.0, 0.04]
+  pos: [0.07, 0.0, 0.07]   # raised and wider so both fingers and the grasp gap stay in view (audit: both fingers 96%)
   xyaxes: [1, 0, 0, 0, -1, 0]
-  fovy: 85
-external_cam_pos: [1.0, 0.0, 0.7]
-external_cam_lookat: [0.4, 0.0, 0.1]
+  fovy: 95
+external_cam_pos: [0.10, 0.0, 0.20]   # on the robot base, looking out over the table: big blocks, the gripper, little else
+external_cam_lookat: [0.45, 0.0, 0.10]
+external_cam_fovy: 80
 cube_half_size: 0.02
-workspace_x: [0.3, 0.55]
-workspace_y: [-0.25, 0.25]
+block_half_xy: [0.018, 0.022]   # cubes, about 4 cm wide
+block_half_z: [0.018, 0.022]
+tasks: [lift]
+n_blocks: [1]
+colors: [red, green, blue]
+held_out_combos: false
+show_pads: false
+gripper_binary: true   # the gripper command is an open/close signal; the Robotiq closes at its own speed and force, the expert lifts once the jaws stopped moving
+held_grip: 0.25   # a policy often closes the Robotiq less than the expert; a block in the air near the pinch point is still held
+layout_pad: [0.0, 0.0]
+workspace_x: [0.33, 0.58]   # what the base camera sees (the arm reaches far more)
+workspace_y: [-0.17, 0.17]
 min_object_dist: 0.12
 table_half: [0.5, 0.45]
 table_center: [0.27, 0.0]

@@ -36,6 +36,7 @@ class PickExpert:
         self.grip = 0.0
         self.success_steps = 0
         self.hold_offset = np.zeros(2)  # ee xy minus block xy once grasped
+        self.g_prev, self.settled = None, 0  # gripper closure last step / steps it has not moved (binary-gripper grasp)
         self.yaw = float(self.s.cube_yaw[self.s.target])  # block yaw used for the grasp orientation
         self.confident = True
 
@@ -85,13 +86,22 @@ class PickExpert:
                 if self.phase == RELEASE:
                     pass
         elif self.phase == GRASP:
-            self.grip = min(1.0, self.grip + GRIP_RATE)
-            if self.grip >= 1.0 and self.t_phase > 1 / GRIP_RATE + 10:
+            if cfg.gripper_binary:  # 'close' is a signal, not a force: the jaws close by themselves, lift once they have stopped moving
+                self.grip = 1.0
+                g = float(env.state(self.i)[-1])
+                still = self.g_prev is not None and abs(g - self.g_prev) < 0.004 and g > cfg.held_grip
+                self.settled, self.g_prev = (self.settled + 1 if still else 0), g
+                ready = self.settled >= 4 or self.t_phase > 80
+            else:
+                self.grip = min(1.0, self.grip + cfg.grip_rate)
+                ready = self.grip >= 1.0 and self.t_phase > 1 / cfg.grip_rate + cfg.grasp_settle
+            if ready:
+                self.g_prev, self.settled = None, 0
                 self.hold_offset = (env.ee_pose(self.i)[:2] - self.cube[:2]).astype(float)
                 self.phase, self.t_phase = LIFT, 0
         elif self.phase == RELEASE:
-            self.grip = max(0.0, self.grip - RELEASE_RATE)
-            if self.grip <= 0.0 and self.t_phase > 1 / RELEASE_RATE + 8:
+            self.grip = 0.0 if cfg.gripper_binary else max(0.0, self.grip - RELEASE_RATE)
+            if self.grip <= 0.0 and self.t_phase > (12 if cfg.gripper_binary else 1 / RELEASE_RATE + 8):
                 self.phase, self.t_phase = RETRACT, 0
         elif self.phase == HOLD:
             if self.t_phase > 10:
@@ -137,14 +147,15 @@ class PickExpert:
         # the grasp point sits grasp_height above the block centre when the block is gripped, whatever its height
         near_grasp = np.linalg.norm(ee - (cube + np.array([0.0, 0.0, cfg.grasp_height]))) < 0.035
         carrying = self.phase in (LIFT, MOVE, LOWER, HOLD)
-        held = near_grasp and g > 0.5 and (cube[2] - z0 > 0.012 or carrying)
+        near_hold = np.linalg.norm(ee - (cube + np.array([0.0, 0.0, cfg.grasp_height]))) < 0.05  # the block may slip a little in the jaws
+        held = near_hold and g > cfg.held_grip and (cube[2] - z0 > 0.012 or carrying)
         self.confident = bool(held or zone_ok or (upright and reach_ok))
         if upright:
             self.yaw = float(np.arctan2(rot[1, 0], rot[0, 0]))
         grasp_pt = np.array([cube[0], cube[1], z0 + cfg.grasp_height])
         # keep the running phase (and its timers / gripper command) while it still matches the world; only re-infer otherwise
         far_xy = np.linalg.norm(ee[:2] - cube[:2])
-        consistent = ((carrying and (held or (self.phase == LIFT and near_grasp and g > 0.5)))
+        consistent = ((carrying and (held or (self.phase == LIFT and near_grasp and g > cfg.held_grip)))
                       or (self.phase == GRASP and near_grasp)
                       or (self.phase == APPROACH and not held and not near_grasp)
                       or (self.phase == DESCEND and not held and far_xy < 0.03)
@@ -153,6 +164,7 @@ class PickExpert:
             return
         self.t_phase = 0
         self.grip = g
+        self.g_prev, self.settled = None, 0
         if zone_ok and not held:
             self.phase = RELEASE if g > 0.3 else RETRACT
         elif held:
@@ -165,6 +177,8 @@ class PickExpert:
             self.grip = 0.0  # jaws open while (re)approaching
             near = np.linalg.norm(ee[:2] - cube[:2]) < 0.012
             self.phase = DESCEND if near else APPROACH
+        if cfg.gripper_binary:
+            self.grip = 1.0 if self.phase in (GRASP, LIFT, MOVE, LOWER, HOLD) else 0.0
 
     # --------------------------------------------------------------- result
     @property

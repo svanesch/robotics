@@ -14,7 +14,8 @@ from robotics.policy.data import VLADataset
 from robotics.policy.model import VLA, VLAConfig, count_params
 from robotics.policy.tokenizer import Tokenizer
 from robotics.policy.train_utils import augment, save_checkpoint, to_device
-
+from robotics.policy.views import save_view, train_view, val_view
+from robotics.status import StatusReporter
 
 def masked_l1(pred, target, is_pad):
     valid = (~is_pad)[..., None].float()
@@ -100,9 +101,9 @@ def main():
     rest = [p for n, p in model.named_parameters() if not n.startswith("backbone") and not n.startswith(lang_names)]
     print(f"trainable parameters: {sum(p.numel() for p in bb + rest + lang) / 1e6:.1f} M")
     lang_lr = cfg.get("lang_lr", cfg["lr"])
-    optim = torch.optim.AdamW([{"params": bb, "lr": cfg["backbone_lr"]}, {"params": rest, "lr": cfg["lr"]},
-                               {"params": lang, "lr": lang_lr}], weight_decay=cfg["weight_decay"])
-    base_lrs = [cfg["backbone_lr"], cfg["lr"], lang_lr]
+    groups = [(g, lr) for g, lr in ((bb, cfg["backbone_lr"]), (rest, cfg["lr"]), (lang, lang_lr)) if g]  # a text-free model has no `lang`
+    optim = torch.optim.AdamW([{"params": g, "lr": lr} for g, lr in groups], weight_decay=cfg["weight_decay"])
+    base_lrs = [lr for _, lr in groups]
     step, best = 0, float("inf")
     if a.resume and (run / "last.pt").exists():
         ck = torch.load(run / "last.pt", map_location=device, weights_only=False)
@@ -115,6 +116,18 @@ def main():
         return 0.5 * (1 + math.cos(math.pi * (s - cfg["warmup_steps"]) / max(1, cfg["steps"] - cfg["warmup_steps"])))
 
     aug = cfg["augment"]
+    rep = StatusReporter("train", cfg["run_name"], total=cfg["steps"],
+                         meta={"dataset": str(cfg["dataset"]), "batch": cfg["batch_size"], "init_from": a.init_from or "-", "device": str(device)})
+    rep.update(progress=step)
+    rep.state["progress0"] = float(step)  # a resumed run only did the steps after this point (for the ETA)
+    if step and (run / "log.jsonl").exists():  # resumed: bring the curves back
+        for line in (run / "log.jsonl").read_text().splitlines():
+            rec = json.loads(line)
+            for k in ("train_l1", "val_l1"):
+                if k in rec and rec["step"] <= step:
+                    rep.series(k, rec[k], x=rec["step"])
+    last_train = None
+    val_idx = np.random.default_rng(0).choice(len(val_ds), 4, replace=False)
     log = open(run / "log.jsonl", "a")
     t0, run_loss, it = time.time(), 0.0, iter(train_loader)
     while step < cfg["steps"]:
@@ -136,18 +149,30 @@ def main():
         step += 1
         run_loss += loss.item()
         if step % cfg["log_every"] == 0:
-            rec = {"step": step, "train_l1": run_loss / cfg["log_every"], "lr": optim.param_groups[1]["lr"],
+            rec = {"step": step, "train_l1": run_loss / cfg["log_every"], "lr": optim.param_groups[-1]["lr"],
                    "sec_per_step": (time.time() - t0) / cfg["log_every"]}
             print(json.dumps(rec), flush=True); log.write(json.dumps(rec) + "\n"); log.flush()
+            rep.update(progress=step, train_l1=rec["train_l1"], lr=rec["lr"], sec_per_step=rec["sec_per_step"])
+            rep.series("train_l1", rec["train_l1"], x=step)
+            last_train = train_view(x)
+            rep.preview(last_train, key="train", min_interval=3.0)
             run_loss, t0 = 0.0, time.time()
         if step % cfg["eval_every"] == 0 or step == cfg["steps"]:
             val, raw = evaluate(model, val_loader, device, first.stats["action_std"], cfg["val_batches"])
             rec = {"step": step, "val_l1": val, "val_l1_raw_per_joint": [round(float(v), 4) for v in raw]}
             print(json.dumps(rec), flush=True); log.write(json.dumps(rec) + "\n"); log.flush()
+            rep.update(progress=step, val_l1=val)
+            rep.series("val_l1", val, x=step)
+            vv = val_view(model, val_ds, device, val_idx)
+            rep.preview(vv, key="val", min_interval=0.0)
+            save_view(run / "views" / f"val_{step:06d}.jpg", vv)  # kept per checkpoint: the dashboard's history pages browse these
+            if last_train is not None:
+                save_view(run / "views" / f"train_{step:06d}.jpg", last_train)
             if val < best:
                 best = val
                 save_checkpoint(run / "best.pt", model, cfg, first.stats, step, {"best_val": best})
             save_checkpoint(run / "last.pt", model, cfg, first.stats, step, {"best_val": best}, optim)
+    rep.finish("done", best_val=best)
     print(f"done. best val l1 (normalised): {best:.4f}")
 
 

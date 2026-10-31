@@ -118,7 +118,8 @@ class MultiCellEnv:
         for i, c in enumerate(self.cells):
             a = actions[i]
             self.data.ctrl[c["arm_ctrl"]] = a[:-1]
-            self.data.ctrl[c["grip_ctrl"]] = g.ctrl_open + np.clip(a[-1], 0, 1) * (g.ctrl_closed - g.ctrl_open)
+            close = float(a[-1] > 0.5) if self.cfg.gripper_binary else float(np.clip(a[-1], 0, 1))  # binary: an open/close signal
+            self.data.ctrl[c["grip_ctrl"]] = g.ctrl_open + close * (g.ctrl_closed - g.ctrl_open)
         mujoco.mj_step(self.model, self.data, nstep=SUBSTEPS)
 
     # ----------------------------------------------------------------- obs

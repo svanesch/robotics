@@ -15,12 +15,13 @@ def main():
     p.add_argument("--seed", type=int, default=0)
     p.add_argument("--keep-failures", action="store_true")
     p.add_argument("--noise", type=float, default=0.0, help="fraction of episodes with random joint perturbations (recovery data)")
+    p.add_argument("--drop", type=float, default=0.0, help="fraction of episodes with a dropped block during the lift: the expert re-plans and picks it up again")
     p.add_argument("--task", default=None, choices=["lift", "place_left", "place_right"], help="restrict to one task (default: mix)")
     p.add_argument("--shadows", action="store_true", help="render shadows (nicer, but ~5x slower with many cells)")
     p.add_argument("--out", default=None)
     a = p.parse_args()
     out = a.out or f"datasets/{a.robot}_pick"
-    r = collect(a.robot, out, a.episodes, a.cells, a.workers, a.image_size, a.seed, a.keep_failures, a.shadows, a.noise, a.task)
+    r = collect(a.robot, out, a.episodes, a.cells, a.workers, a.image_size, a.seed, a.keep_failures, a.shadows, a.noise, a.task, a.drop)
     print(f"saved {r['saved']} episodes ({r['frames']} frames) to {out}; "
           f"expert success rate {r['saved'] / max(r['attempted'], 1):.0%}; {r['seconds']:.0f}s")
 

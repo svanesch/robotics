@@ -66,6 +66,20 @@ class RobotConfig:
     zone_xy: list[float] = field(default_factory=lambda: [0.21, 0.20])  # place pads at (x, +-y) rel. to base
     zone_half: float = 0.045
     backdrop_color: list[float] = field(default_factory=lambda: [0.78, 0.8, 0.84])  # wall behind the robot
+    tasks: list[str] = field(default_factory=lambda: ["lift", "place_left", "place_right"])
+    task_weights: list[float] | None = None  # None: 0.4/0.3/0.3 for the default three tasks, else uniform
+    n_blocks: list[int] = field(default_factory=lambda: [2, 3, 4])
+    n_blocks_p: list[float] | None = None  # None: 0.25/0.45/0.30 for [2,3,4], else uniform
+    colors: list[str] | None = None  # None: every colour in CUBE_COLORS
+    block_half_xy: list[float] = field(default_factory=lambda: [0.0115, 0.0145])  # half width range [m]
+    block_half_z: list[float] = field(default_factory=lambda: [0.016, 0.026])  # half height range [m]
+    layout_pad: list[float] = field(default_factory=lambda: [0.03, 0.03])  # blocks may lie this far outside workspace_x/y (all blocks alike)
+    gripper_binary: bool = False  # the gripper command is an open/close signal (no force or position ramp); the hardware closes by itself
+    grip_rate: float = 0.015  # how fast the expert closes the gripper per control step (1/rate steps from open to closed)
+    grasp_settle: int = 10  # extra steps the expert waits after the gripper command is fully closed before it lifts
+    held_grip: float = 0.5  # gripper closed fraction above which a block between the jaws counts as held (sync/DAgger labelling)
+    held_out_combos: bool = True  # keep colour x task combos for the test split only (only meaningful with prompts)
+    show_pads: bool = True  # draw the left/right place pads
     table_half: list[float] = field(default_factory=lambda: [0.4, 0.4])
     table_color: list[float] = field(default_factory=lambda: [0.62, 0.48, 0.36])  # fixed per robot
     table_center: list[float] = field(default_factory=lambda: [0.0, 0.0])  # xy offset from the robot base

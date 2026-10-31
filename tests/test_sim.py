@@ -143,3 +143,30 @@ def test_expert_resumes_after_handover(task):
         if all(r is not None for r in result):
             break
     assert sum(bool(r) for r in result) >= n - 1, result
+
+
+def test_target_position_is_not_distinguishable_from_distractors():
+    """All blocks share one position distribution: the target is not systematically more central than the others."""
+    cfg = load_robot("so101")
+    rng = np.random.default_rng(0)
+    centre = np.array([np.mean(cfg.workspace_x), np.mean(cfg.workspace_y)])
+    t_d, o_d = [], []
+    for _ in range(400):
+        s = sample_scene(cfg, rng, task="lift")
+        d = np.linalg.norm(s.cube_xy - centre, axis=1)
+        t_d.append(d[s.target])
+        o_d += [d[k] for k in range(len(s.active)) if s.active[k] and k != s.target]
+    assert abs(np.mean(t_d) - np.mean(o_d)) < 0.008, (np.mean(t_d), np.mean(o_d))
+
+
+def test_camera_audit_ur5e():
+    """UR5e: blocks and gripper in the base-mounted external view and both gripper fingers in the wrist view. The wrist camera exists to show
+    the gripper; the target only has to be visible once the gripper is close, so target visibility is not required."""
+    import subprocess
+    import sys
+    from pathlib import Path
+
+    root = Path(__file__).resolve().parents[1]
+    r = subprocess.run([sys.executable, "scripts/audit_cameras.py", "--robot", "ur5e", "--episodes", "8", "--seed", "5",
+                        "--min-fingers", "0.9", "--min-wrist", "0", "--external-items", "blocks,tip", "--min-external", "0.95"], cwd=root, capture_output=True, text=True)
+    assert r.returncode == 0, r.stdout[-900:]

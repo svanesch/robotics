@@ -13,14 +13,14 @@ import torch
 
 from robotics.envs.multi_cell import MultiCellEnv
 from robotics.policy.rollout import PolicyRunner, TemporalEnsemble, parse_prompt, run_episodes, scene_for_prompt
-from robotics.policy.train_utils import load_policy
+from robotics.policy.train_utils import load_policy, robot_for_checkpoint
 from robotics.robots.spec import load_robot
 
 
 def main():
     p = argparse.ArgumentParser()
     p.add_argument("--checkpoint", required=True)
-    p.add_argument("--robot", default="so101")
+    p.add_argument("--robot", default=None, help="default: inferred from the checkpoint")
     p.add_argument("--prompt", default=None)
     p.add_argument("--episodes", type=int, default=1)
     p.add_argument("--seed", type=int, default=0)
@@ -31,8 +31,8 @@ def main():
     a = p.parse_args()
     if not (a.prompt or a.interactive):
         p.error("give --prompt or --interactive")
-    cfg = load_robot(a.robot)
     model, ck = load_policy(a.checkpoint, a.device)
+    cfg = load_robot(robot_for_checkpoint(ck, a.robot))
     runner = PolicyRunner(model, ck, a.device)
     rng = np.random.default_rng(a.seed)
     size = model.cfg.image_size

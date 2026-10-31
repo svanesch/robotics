@@ -45,6 +45,15 @@ def save_checkpoint(path, model: VLA, cfg: dict, stats: dict, step: int, extra: 
     torch.save(payload, path)
 
 
+def robot_for_checkpoint(ck: dict, override: str | None = None) -> str:
+    """Which robot a checkpoint was trained for (from the dataset it was trained on), unless one is given explicitly."""
+    if override:
+        return override
+    ds = ck["train_cfg"]["dataset"]
+    ds = " ".join(ds) if isinstance(ds, list) else str(ds)
+    return "ur5e" if "ur5e" in ds else "so101"
+
+
 def load_policy(path, device: str | torch.device = "cpu") -> tuple[VLA, dict]:
     ck = torch.load(path, map_location=device, weights_only=False)
     mc = dict(ck["model_cfg"])
