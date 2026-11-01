@@ -8,6 +8,7 @@ from robotics.robots.spec import RobotConfig
 from robotics.sim.builder import CUBE_COLORS, N_CUBES
 
 TASKS = ("lift", "place_left", "place_right")
+STACK_COLORS = ("red", "green", "blue")  # stack task: block 0 is the base, 1 goes on it, 2 goes on block 1
 TASK_WEIGHTS = (0.4, 0.3, 0.3)
 
 LIFT_TEMPLATES = [
@@ -92,12 +93,17 @@ def sample_scene(cfg: RobotConfig, rng: np.random.Generator, split: str = "train
             base = list(rng.choice(colors_all, size=len(colors_all), replace=False))
             colors = [base[k % len(base)] for k in range(N_CUBES)]
             chosen_task = str(rng.choice(tasks, p=p_t))
+    if chosen_task == "stack":
+        n, target = 3, 1
+        colors = list(STACK_COLORS) + colors[3:]
     lo_xy, hi_xy = cfg.block_half_xy
     lo_z, hi_z = cfg.block_half_z
     half = np.stack([rng.uniform(lo_xy, hi_xy, N_CUBES), rng.uniform(lo_xy, hi_xy, N_CUBES), rng.uniform(lo_z, hi_z, N_CUBES)], axis=1)
     active = np.arange(N_CUBES) < n
     side = {"place_left": "left", "place_right": "right"}.get(chosen_task)
     text = (str(rng.choice(LIFT_TEMPLATES)) if side is None else str(rng.choice(PLACE_TEMPLATES)))
+    if chosen_task == "stack":
+        text = "stack the green block on the red block, then the blue block on the green block"
     return SceneSample(
         cube_xy=_positions(cfg, rng, n),
         cube_yaw=rng.uniform(-np.pi, np.pi, N_CUBES),

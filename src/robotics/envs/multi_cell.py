@@ -25,7 +25,7 @@ class SceneSample:
     cam_pos_jitter: np.ndarray
     cam_look_jitter: np.ndarray
     speed_scale: float
-    task: str  # "lift" | "place_left" | "place_right"
+    task: str  # "lift" | "place_left" | "place_right" | "stack" (green on red, then blue on green; the expert moves `target` from 1 to 2)
     active: np.ndarray  # (N_CUBES,) bool: blocks on the table; the rest are parked out of view
     cube_half: np.ndarray  # (N_CUBES, 3) half extents
     hover_extra: float
@@ -151,6 +151,12 @@ class MultiCellEnv:
     def target_lifted(self, i: int) -> float:
         s = self.cells[i]["scene"]
         return float(self.cube_pos(i)[s.target][2] - s.cube_half[s.target][2])
+
+    def stacked(self, i: int, top: int, bottom: int) -> bool:
+        """Block `top` rests on block `bottom` (centres within 2.5 cm in xy, heights as for a block sitting on the other)."""
+        s, p = self.cells[i]["scene"], self.cube_pos(i)
+        dz = p[top][2] - p[bottom][2] - (s.cube_half[top][2] + s.cube_half[bottom][2])
+        return bool(np.linalg.norm(p[top][:2] - p[bottom][:2]) < 0.025 and abs(dz) < 0.012)
 
     def zone_center(self, side: int) -> np.ndarray:
         """xy of the place pad (+1 = left/+y, -1 = right/-y) relative to the robot base."""

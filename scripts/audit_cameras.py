@@ -62,6 +62,7 @@ def main():
     p.add_argument("--episodes", type=int, default=24)
     p.add_argument("--cells", type=int, default=4)
     p.add_argument("--seed", type=int, default=0)
+    p.add_argument("--task", default=None, help="scene task, e.g. stack (default: the robot's own mix)")
     p.add_argument("--image-size", type=int, default=128)
     p.add_argument("--min-external", type=float, default=0.99)
     p.add_argument("--min-wrist", type=float, default=0.90)
@@ -88,7 +89,7 @@ def main():
     while done_eps < a.episodes:
         experts = []
         for i in range(a.cells):
-            env.reset_cell(i, sample_scene(cfg, rng))
+            env.reset_cell(i, sample_scene(cfg, rng, task=a.task))
             experts.append(PickExpert(env, ik, i))
         finished = [False] * a.cells
         for t in range(300):

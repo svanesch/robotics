@@ -26,7 +26,7 @@ def free_camera(cfg) -> mujoco.MjvCamera:
     cam = mujoco.MjvCamera()
     cam.type = mujoco.mjtCamera.mjCAMERA_FREE
     if cfg.name == "ur5e":
-        cam.lookat[:], cam.distance, cam.azimuth, cam.elevation = [0.42, 0.0, 0.12], 1.35, 145, -24
+        cam.lookat[:], cam.distance, cam.azimuth, cam.elevation = [0.45, 0.0, 0.10], 1.15, 90, -38  # side view over the table; azimuth 145 looks through the cell's back wall
     else:
         cam.lookat[:], cam.distance, cam.azimuth, cam.elevation = [cfg.workspace_x[0] + 0.1, 0.0, 0.08], 0.95, 140, -22
     return cam
@@ -38,6 +38,7 @@ def main():
     p.add_argument("--checkpoint", default=None, help="default: runs/<run>/best.pt")
     p.add_argument("--robot", default=None, help="default: inferred from the dataset the run was trained on")
     p.add_argument("--split", default="test")
+    p.add_argument("--task", default=None, help="e.g. stack")
     p.add_argument("--episodes", type=int, default=8)
     p.add_argument("--seed", type=int, default=1234)
     p.add_argument("--device", default="cuda" if torch.cuda.is_available() else "cpu")
@@ -48,7 +49,7 @@ def main():
     runner = PolicyRunner(model, ck, a.device)
     env = MultiCellEnv(cfg, 1, model.cfg.image_size)
     rng = np.random.default_rng(a.seed)
-    scenes = [sample_scene(cfg, rng, split=a.split) for _ in range(a.episodes)]
+    scenes = [sample_scene(cfg, rng, split=a.split, task=a.task) for _ in range(a.episodes)]
     big = mujoco.Renderer(env.model, 512, 512)
     cam = free_camera(cfg)
     up = lambda img: np.kron(img, np.ones((2, 2, 1), np.uint8))  # noqa: E731

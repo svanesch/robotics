@@ -16,7 +16,7 @@ def main():
     p.add_argument("--keep-failures", action="store_true")
     p.add_argument("--noise", type=float, default=0.0, help="fraction of episodes with random joint perturbations (recovery data)")
     p.add_argument("--drop", type=float, default=0.0, help="fraction of episodes with a dropped block during the lift: the expert re-plans and picks it up again")
-    p.add_argument("--task", default=None, choices=["lift", "place_left", "place_right"], help="restrict to one task (default: mix)")
+    p.add_argument("--task", default=None, choices=["lift", "place_left", "place_right", "stack"], help="restrict to one task (default: mix)")
     p.add_argument("--shadows", action="store_true", help="render shadows (nicer, but ~5x slower with many cells)")
     p.add_argument("--out", default=None)
     a = p.parse_args()

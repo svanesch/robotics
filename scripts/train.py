@@ -77,8 +77,19 @@ def main():
     kw = dict(num_workers=cfg["num_workers"], pin_memory=device.type == "cuda", persistent_workers=cfg["num_workers"] > 0)
     boost, n_early = cfg.get("early_frame_weight", 1.0), cfg.get("early_frames", 50)
     rw = cfg.get("root_weights") or [1.0] * len(train_sets)  # per-dataset sampling weight (e.g. upweight DAgger data)
-    if boost != 1.0 or any(x != 1.0 for x in rw):  # the first frames of an episode are where the prompt decides which block to go for
-        w = np.concatenate([np.where(np.arange(len(d)) - d.starts[d.frame_ep] < n_early, boost, 1.0) * k for d, k in zip(train_sets, rw)])
+    rel_w, rel_win = cfg.get("release_weight", 1.0), cfg.get("release_window", 40)
+
+    def release_boost(d) -> np.ndarray:  # frames around the moment the gripper opens: placing is short but decides the stack
+        w = np.ones(len(d))
+        closed = d.action[:, -1] > 0.5
+        for st, ln in zip(d.starts, d.lengths):
+            c = closed[st:st + ln]
+            for t in np.flatnonzero(c[:-1] & ~c[1:]) + 1:
+                w[st + max(0, t - rel_win):st + min(ln, t + rel_win // 2)] = rel_w
+        return w
+
+    if boost != 1.0 or rel_w != 1.0 or any(x != 1.0 for x in rw):  # the first frames of an episode are where the prompt decides which block to go for
+        w = np.concatenate([np.where(np.arange(len(d)) - d.starts[d.frame_ep] < n_early, boost, 1.0) * release_boost(d) * k for d, k in zip(train_sets, rw)])
         sampler = WeightedRandomSampler(torch.from_numpy(w), num_samples=len(train_ds), replacement=True)
         train_loader = DataLoader(train_ds, cfg["batch_size"], sampler=sampler, drop_last=True, **kw)
     else:

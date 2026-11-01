@@ -52,3 +52,4 @@ gripper_bodies: [grip_left_pad, grip_right_pad]
 gripper_friction: 2.0
 object_friction: 2.0
 table_color: [0.42, 0.45, 0.5]   # slate grey laminate
+noslip_iterations: 10   # anti-creep pass: a block held in the jaws no longer slips while it is carried to a tower (stack expert 9/16 -> 13/16)

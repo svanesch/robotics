@@ -44,6 +44,7 @@ def main():
     p.add_argument("--dataset", default=None, help="default: the dataset the checkpoint was trained on")
     p.add_argument("--robot", default=None, help="default: inferred from the checkpoint")
     p.add_argument("--split", default="test", choices=["train", "val", "test"])
+    p.add_argument("--task", default=None, help="scene task (e.g. stack); default: the robot's own mix")
     p.add_argument("--episodes", type=int, default=150)
     p.add_argument("--cells", type=int, default=6)
     p.add_argument("--offline-frames", type=int, default=3000)
@@ -65,7 +66,7 @@ def main():
     cfg = load_robot(robot_for_checkpoint(ck, a.robot))
     rng = np.random.default_rng(a.seed)
     env = MultiCellEnv(cfg, a.cells, model.cfg.image_size)
-    scenes = [sample_scene(cfg, rng, split=a.split) for _ in range(a.episodes)]
+    scenes = [sample_scene(cfg, rng, split=a.split, task=a.task) for _ in range(a.episodes)]
     rep = StatusReporter("eval", f"eval-{Path(a.checkpoint).parent.name}-{a.split}{a.tag}", total=len(scenes),
                          meta={"robot": cfg.name, "checkpoint": a.checkpoint, "split": a.split, "cells": a.cells})
     res = run_episodes(runner, env, scenes, ens_m=a.ens_m, replan=a.replan, status=rep)
@@ -95,6 +96,11 @@ def main():
     print(f"behaviour: closest approach median {beh['median_closest_cm_requested']:.1f} cm (requested) vs {beh['median_closest_cm_other']:.1f} cm (nearest other); "
           f"within 4 cm of requested {beh['within_4cm_requested']}/{n}; grasped requested {beh['grasp_requested']}, other {beh['grasp_other']}, neither {beh['grasp_neither']}; "
           f"lifted requested {beh['lifted_requested']}, other {beh['lifted_other']}")
+    stack = [r for r in res if r.task == "stack"]
+    if stack:
+        beh["stack_first_block_placed"] = sum(r.stage1 for r in stack)
+        beh["stack_tower"] = sum(r.success for r in stack)
+        print(f"stacking: first block on the base in {beh['stack_first_block_placed']}/{len(stack)}, full tower in {beh['stack_tower']}/{len(stack)}")
     out = Path(a.checkpoint).parent / f"eval_{a.split}{a.tag}.json"
     out.write_text(json.dumps({"behaviour": beh, "settings": {"ens_m": a.ens_m, "replan": a.replan, "seed": a.seed}, "failure_breakdown": why, "offline": off, "closed_loop": {k: v for k, v in rows.items()}, "wrong_block_rate": wrong,
                                "step": ck["step"], "episodes": len(res)}, indent=2))

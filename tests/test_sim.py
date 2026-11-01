@@ -182,3 +182,42 @@ def test_ur5e_binary_gripper_command_is_open_or_closed():
         env.step(np.append(env.state(0)[:-1], cmd)[None])
         want = g.ctrl_open + expect * (g.ctrl_closed - g.ctrl_open)
         assert env.data.ctrl[env.cells[0]["grip_ctrl"]] == want
+
+
+def test_stack_scene_and_stacked_check():
+    cfg = load_robot("ur5e")
+    s = sample_scene(cfg, np.random.default_rng(0), task="stack")
+    assert s.task == "stack" and s.cube_colors[:3] == ["red", "green", "blue"] and s.target == 1
+    assert s.active.tolist() == [True, True, True, False]
+    env = MultiCellEnv(cfg, 1, 32, render=False)
+    env.reset_cell(0, s)
+    assert not env.stacked(0, 1, 0)
+    c = env.cells[0]
+    base = env.cube_pos(0)[0]
+    a = c["cube_qadr"][1]  # put block 1 right on top of block 0
+    env.data.qpos[a:a + 3] = c["origin"] + [base[0], base[1], base[2] + s.cube_half[0][2] + s.cube_half[1][2]]
+    import mujoco
+    mujoco.mj_forward(env.model, env.data)
+    assert env.stacked(0, 1, 0)
+    env.data.qpos[a + 1] += 0.05  # 5 cm sideways: no longer stacked
+    mujoco.mj_forward(env.model, env.data)
+    assert not env.stacked(0, 1, 0)
+
+
+def test_stack_expert_moves_on_to_the_third_block_and_builds_towers():
+    cfg = load_robot("ur5e")
+    n = 4
+    env = MultiCellEnv(cfg, n, 32, render=False)
+    ik, rng = ArmIK(cfg), np.random.default_rng(11)
+    experts = []
+    for i in range(n):
+        env.reset_cell(i, sample_scene(cfg, rng, task="stack"))
+        experts.append(PickExpert(env, ik, i))
+    done = [False] * n
+    for _ in range(520):
+        env.step(np.stack([e.act()[0] for e in experts]))
+        done = [d or e.phase == 9 for d, e in zip(done, experts)]
+        if all(done):
+            break
+    assert all(e.stage == 1 and e.s.target == 2 for e in experts)  # stage 0 finished, block 2 was the next one
+    assert sum(e.success for e in experts) >= 1

@@ -16,12 +16,15 @@ def main():
     p.add_argument("--seed", type=int, default=5000)
     p.add_argument("--policy-prob-full", type=float, default=0.3, help="fraction of episodes the policy drives from start to end")
     p.add_argument("--max-steps", type=int, default=480)
+    p.add_argument("--task", default=None, help="e.g. stack")
+    p.add_argument("--handover-max", type=int, default=230)
     p.add_argument("--ens-m", type=float, default=0.01)
     p.add_argument("--replan", type=int, default=None)
     p.add_argument("--device", default="cuda" if torch.cuda.is_available() else "cpu")
     a = p.parse_args()
     s = collect_dagger(a.checkpoint, a.out, a.episodes, a.cells, a.seed, a.policy_prob_full, max_steps=a.max_steps,
-                       device=a.device, ens_m=a.ens_m, replan=a.replan, robot=a.robot)
+                       device=a.device, ens_m=a.ens_m, replan=a.replan, robot=a.robot, task=a.task,
+                       handover_range=(30, a.handover_max))
     print(f"saved {s['episodes']} episodes / {s['frames']} frames ({s['policy_frames']} policy-driven) to {a.out}; "
           f"expert success at the end {s['expert_success']}/{s['episodes']}; cut for no valid label {s['cut_unconfident']}; {s['seconds']:.0f}s")
 

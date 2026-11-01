@@ -29,7 +29,7 @@ MIN_STEPS = 25
 
 def collect_dagger(checkpoint: str, out: str, episodes: int, cells: int = 8, seed: int = 0, policy_prob_full: float = 0.3,
                    handover_range: tuple[int, int] = (30, 230), max_steps: int = 480, device: str = "cuda",
-                   ens_m: float = 0.01, replan: int | None = None, robot: str | None = None) -> dict:
+                   ens_m: float = 0.01, replan: int | None = None, robot: str | None = None, task: str | None = None) -> dict:
     model, ck = load_policy(checkpoint, device)
     robot = robot_for_checkpoint(ck, robot)  # the robot the policy was trained for
     cfg = load_robot(robot)
@@ -49,7 +49,7 @@ def collect_dagger(checkpoint: str, out: str, episodes: int, cells: int = 8, see
 
     def start(i: int) -> None:
         split[i] = "val" if rng.random() < 0.1 else "train"
-        env.reset_cell(i, sample_scene(cfg, rng, split=split[i]))
+        env.reset_cell(i, sample_scene(cfg, rng, split=split[i], task=task))
         experts[i] = PickExpert(env, ik, i)
         ens.reset(i)
         tokens[i] = runner.tok.encode(env.cells[i]["scene"].instruction)

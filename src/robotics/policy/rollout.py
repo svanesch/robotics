@@ -17,6 +17,7 @@ from robotics.policy.tokenizer import Tokenizer
 from robotics.sim.builder import CUBE_COLORS
 
 MAX_STEPS = 560
+STACK_MAX_STEPS = 720
 SUCCESS_HOLD = 12  # consecutive steps the success condition must hold
 
 
@@ -77,6 +78,7 @@ class EpisodeResult:
     n_blocks: int = 0
     other_lifted: bool = False  # a block that was NOT requested got lifted off the table
     target_lifted: bool = False  # the requested block was lifted at least once
+    stage1: bool = False  # stacking: the first block was put on the base block (jaws open) at least once
     frames: list = field(default_factory=list)
 
 
@@ -105,6 +107,8 @@ def run_episodes(runner: PolicyRunner, env: MultiCellEnv, scenes: list, max_step
     """Run len(scenes) episodes, `env.n` at a time in parallel cells. record_cell0(frame_fn) gets called each step for cell 0."""
     results: list[EpisodeResult] = []
     cfg = env.cfg
+    if any(s.task == "stack" for s in scenes):
+        max_steps = max(max_steps, STACK_MAX_STEPS)  # two picks and two places take longer than a lift
     for batch_start in range(0, len(scenes), env.n):
         group = scenes[batch_start: batch_start + env.n]
         n = len(group)
@@ -125,6 +129,7 @@ def run_episodes(runner: PolicyRunner, env: MultiCellEnv, scenes: list, max_step
         success_t = [max_steps] * n
         other_lifted = [False] * n
         target_lifted = [False] * n
+        stage1 = [False] * n
         for t in range(max_steps):
             imgs = [env.render(i) for i in range(env.n)]
             pred = runner.predict(np.stack([x["wrist"] for x in imgs]), np.stack([x["external"] for x in imgs]),
@@ -146,7 +151,7 @@ def run_episodes(runner: PolicyRunner, env: MultiCellEnv, scenes: list, max_step
                 moved = np.linalg.norm(cp[:, :2] - start_pos[i][:, :2], axis=1) > 0.04
                 moved &= s.active
                 moved[s.target] = False
-                wrong[i] |= bool(moved.any())
+                wrong[i] |= bool(moved.any()) and s.task != "stack"  # in a stack every block moves
                 dist = np.linalg.norm(cp - env.ee_pose(i)[:3], axis=1)
                 dist[~s.active] = 9.0
                 d_t[i] = min(d_t[i], float(dist[s.target]))
@@ -164,6 +169,10 @@ def run_episodes(runner: PolicyRunner, env: MultiCellEnv, scenes: list, max_step
                 target_lifted[i] |= bool(lift[s.target] > 0.02)
                 if s.task == "lift":
                     ok = env.target_lifted(i) > 0.04
+                elif s.task == "stack":
+                    placed1, open_ = env.stacked(i, 1, 0), env.state(i)[-1] < 0.3
+                    stage1[i] |= bool(placed1 and open_)
+                    ok = bool(placed1 and env.stacked(i, 2, 1) and open_)
                 else:
                     zone = env.zone_center(1 if s.task == "place_left" else -1)
                     ok = (bool(np.all(np.abs(cp[s.target][:2] - zone) < cfg.zone_half)) and env.target_lifted(i) < 0.012
@@ -177,7 +186,7 @@ def run_episodes(runner: PolicyRunner, env: MultiCellEnv, scenes: list, max_step
             results.append(EpisodeResult(s.task, s.cube_colors[s.target], s.instruction, done[i], success_t[i] + 1, wrong[i],
                                          (s.cube_colors[s.target], s.task) in HELD_OUT,
                                          d_t[i], d_o[i], closed_t[i] > 5, closed_o[i] > 5,
-                                         int(s.active.sum()), other_lifted[i], target_lifted[i]))
+                                         int(s.active.sum()), other_lifted[i], target_lifted[i], stage1[i]))
         if status is not None:
             status.update(progress=len(results), success_rate=sum(r.success for r in results) / len(results))
     return results
